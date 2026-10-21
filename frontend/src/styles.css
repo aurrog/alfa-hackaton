@@ -1,0 +1,105 @@
+:root {
+  --app-bg: #f5f6f9;
+  --ink: #14161f;
+  --muted: #687089;
+  --line: #e4e7ee;
+}
+
+[data-mantine-color-scheme='dark'] {
+  --app-bg: #101219;
+  --ink: #eef0f6;
+  --muted: #9aa2b8;
+  --line: #262a36;
+}
+
+html,
+body {
+  background: var(--app-bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* маршрут заявки */
+.route {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+.route-step {
+  position: relative;
+  padding: 10px 10px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--mantine-color-body);
+  min-height: 64px;
+  transition: background 0.3s, border-color 0.3s;
+}
+.route-step .bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  margin-bottom: 8px;
+}
+.route-step.done .bar { background: var(--mantine-color-lime-6); }
+.route-step.failed .bar { background: var(--mantine-color-signal-6); }
+.route-step.current { border-width: 2px; }
+.route-step.current.client { border-color: var(--mantine-color-amber-5); background: var(--mantine-color-amber-0); }
+.route-step.current.bank { border-color: var(--mantine-color-violet-5); background: var(--mantine-color-violet-0); }
+.route-step.current.system { border-color: var(--mantine-color-route-5); background: var(--mantine-color-route-0); }
+.route-step.current .bar { background: currentColor; }
+.route-step.current.client .bar { background: var(--mantine-color-amber-5); }
+.route-step.current.bank .bar { background: var(--mantine-color-violet-5); }
+.route-step.current.system .bar {
+  background: linear-gradient(90deg, var(--mantine-color-route-2), var(--mantine-color-route-6), var(--mantine-color-route-2));
+  background-size: 200% 100%;
+  animation: flow 1.4s linear infinite;
+}
+[data-mantine-color-scheme='dark'] .route-step.current.client,
+[data-mantine-color-scheme='dark'] .route-step.current.bank,
+[data-mantine-color-scheme='dark'] .route-step.current.system { background: var(--mantine-color-dark-6); }
+.route-step .title { font-size: 13px; font-weight: 600; line-height: 1.25; }
+.route-step .state { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.route.compact { gap: 3px; }
+.route.compact .route-step { min-height: 0; padding: 0; border: 0; background: none; }
+.route.compact .route-step .bar { margin: 0; height: 6px; }
+@keyframes flow { from { background-position: 200% 0; } to { background-position: 0 0; } }
+@media (max-width: 720px) {
+  .route { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .route.compact { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+/* карточки ленты */
+.feed-card { transition: box-shadow 0.15s, transform 0.15s; }
+.feed-card:hover { box-shadow: 0 6px 24px rgba(20, 22, 31, 0.07); }
+.why { font-size: 12px; color: var(--muted); }
+.why b { color: var(--ink); font-weight: 600; }
+
+/* поле с источником автозаполнения */
+.prefilled input,
+.prefilled textarea { background: var(--mantine-color-route-0); }
+[data-mantine-color-scheme='dark'] .prefilled input { background: var(--mantine-color-dark-6); }
+
+.hero {
+  background: radial-gradient(1200px 300px at 10% -20%, rgba(61, 123, 255, 0.18), transparent),
+    linear-gradient(135deg, #14161f 0%, #1d2133 100%);
+  color: #fff;
+  border: 0 !important;
+}
+.hero .muted { color: #b7bdd0; }
+
+.markdown h1 { font-size: 1.2rem; margin: 0 0 0.6rem; }
+.markdown h2 { font-size: 1rem; margin: 1rem 0 0.4rem; }
+.markdown p, .markdown li { font-size: 14px; line-height: 1.55; }
+
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.pulse { animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
