@@ -31,6 +31,7 @@ dev = [
 testpaths = ["tests"]
 markers = ["integration: требует PostgreSQL (DATABASE_URL_TEST)"]
 addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning:fastapi.testclient", "ignore:Using `httpx` with `starlette.testclient`"]
 
 [tool.ruff]
 line-length = 140

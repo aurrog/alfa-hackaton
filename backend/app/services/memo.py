@@ -15,6 +15,10 @@ def _m(x) -> str:
     return "—" if x is None else f"{float(x):,.0f} ₽".replace(",", " ")
 
 
+def _n(x) -> str:
+    return "—" if x is None else str(x).replace(".", ",")
+
+
 def build_memo(d: dict) -> dict:
     a, c, rec, sc, der = d["application"], d["company"], d.get("recommendation") or {}, d.get("scoring") or {}, d.get("derived") or {}
     lines = [f"# Кредитное заключение (черновик) — заявка {a['number']}", ""]
@@ -32,9 +36,9 @@ def build_memo(d: dict) -> dict:
     aff = rec.get("affordability") or {}
     if aff:
         lines.append(f"Операционный денежный поток (оценка по отраслевой маржинальности {aff.get('sector_margin', 0):.0%}): "
-                     f"{_m(aff.get('operating_cash_flow'))} в месяц; посильный новый платёж при DSCR ≥ {aff.get('min_dscr')}: "
+                     f"{_m(aff.get('operating_cash_flow'))} в месяц; посильный новый платёж при DSCR ≥ {_n(aff.get('min_dscr'))}: "
                      f"{_m(aff.get('max_new_payment'))}. Ограничивающий фактор суммы: {aff.get('binding_cap')}."
-                     + (f" DSCR при предлагаемых условиях: {aff.get('dscr_at_offer')}." if aff.get('dscr_at_offer') else ""))
+                     + (f" DSCR при предлагаемых условиях: {_n(aff.get('dscr_at_offer'))}." if aff.get('dscr_at_offer') else ""))
     lines.append("")
     if sc:
         lines += ["## 4. Скоринговая оценка",
@@ -58,7 +62,7 @@ def build_memo(d: dict) -> dict:
             lines.append("Рекомендация движка: отказ. Причины: " + "; ".join(r.get("client_text", "") for r in rec.get("reason_codes", [])) + ".")
         else:
             lines.append(f"Рекомендация движка: {'одобрить' if rec.get('outcome') == 'approve' else 'одобрить на изменённых условиях'} "
-                         f"{_m(rec.get('amount'))} на {rec.get('term_months')} мес. под {rec.get('rate')}% "
+                         f"{_m(rec.get('amount'))} на {rec.get('term_months')} мес. под {_n(rec.get('rate'))}% "
                          f"(платёж {_m(rec.get('monthly_payment'))}).")
             if rec.get("conditions"):
                 lines.append("Условия: " + "; ".join(rec["conditions"]) + ".")

@@ -19,3 +19,7 @@ ml/data/*.csv
 .idea/
 .vscode/
 .DS_Store
+
+# Тестовые файлы
+backend/tests/.uploads/
+test-results.xml
