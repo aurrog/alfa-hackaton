@@ -1,0 +1,686 @@
+{
+  "model_id": "sme-scorecard",
+  "version": "1.0.0",
+  "built_at": "2026-10-20",
+  "description": "Скоринговая карта (логистическая регрессия на WOE) для кредитов МСП. Обучена на синтетических данных.",
+  "target": "Дефолт 90+ дней в течение 12 месяцев после выдачи",
+  "scaling": {
+    "base_score": 600,
+    "base_odds": 30.0,
+    "pdo": 40.0,
+    "factor": 57.707802,
+    "offset": 403.724376
+  },
+  "features": [
+    {
+      "name": "business_age_months",
+      "title": "Срок ведения бизнеса",
+      "source": "ЕГРЮЛ / ЕГРИП",
+      "type": "numeric",
+      "unit": "мес.",
+      "bins": [
+        {
+          "lower": null,
+          "upper": 6,
+          "label": "менее 6 мес.",
+          "points": 11,
+          "woe": -0.8005,
+          "bad_rate": 0.1851,
+          "share": 0.028
+        },
+        {
+          "lower": 6,
+          "upper": 12,
+          "label": "6–12 мес.",
+          "points": 24,
+          "woe": -0.5654,
+          "bad_rate": 0.1525,
+          "share": 0.0765
+        },
+        {
+          "lower": 12,
+          "upper": 24,
+          "label": "1–2 года",
+          "points": 38,
+          "woe": -0.2875,
+          "bad_rate": 0.1201,
+          "share": 0.1973
+        },
+        {
+          "lower": 24,
+          "upper": 48,
+          "label": "2–4 года",
+          "points": 55,
+          "woe": 0.0279,
+          "bad_rate": 0.0905,
+          "share": 0.2137
+        },
+        {
+          "lower": 48,
+          "upper": 96,
+          "label": "4–8 лет",
+          "points": 72,
+          "woe": 0.3354,
+          "bad_rate": 0.0682,
+          "share": 0.2916
+        },
+        {
+          "lower": 96,
+          "upper": null,
+          "label": "более 8 лет",
+          "points": 72,
+          "woe": 0.3342,
+          "bad_rate": 0.0682,
+          "share": 0.1929
+        }
+      ],
+      "missing": null,
+      "max_points": 72,
+      "client_hint": "Срок работы бизнеса со временем повышает оценку; молодому бизнесу помогают поручительство гарантийного фонда или залог.",
+      "beta": -0.92578,
+      "iv": 0.1214
+    },
+    {
+      "name": "annual_revenue_mln",
+      "title": "Годовая выручка",
+      "source": "ФНС «Прозрачный бизнес» / обороты по счёту",
+      "type": "numeric",
+      "unit": "млн ₽",
+      "bins": [
+        {
+          "lower": null,
+          "upper": 5,
+          "label": "до 5 млн ₽",
+          "points": 14,
+          "woe": -1.0867,
+          "bad_rate": 0.2326,
+          "share": 0.0445
+        },
+        {
+          "lower": 5,
+          "upper": 15,
+          "label": "5–15 млн ₽",
+          "points": 39,
+          "woe": -0.4119,
+          "bad_rate": 0.1339,
+          "share": 0.2059
+        },
+        {
+          "lower": 15,
+          "upper": 60,
+          "label": "15–60 млн ₽",
+          "points": 56,
+          "woe": 0.0488,
+          "bad_rate": 0.0889,
+          "share": 0.485
+        },
+        {
+          "lower": 60,
+          "upper": 200,
+          "label": "60–200 млн ₽",
+          "points": 81,
+          "woe": 0.7258,
+          "bad_rate": 0.0471,
+          "share": 0.2236
+        },
+        {
+          "lower": 200,
+          "upper": null,
+          "label": "более 200 млн ₽",
+          "points": 93,
+          "woe": 1.0668,
+          "bad_rate": 0.0334,
+          "share": 0.041
+        }
+      ],
+      "missing": null,
+      "max_points": 93,
+      "client_hint": "Подтверждённая выручка повышает оценку: проводите выручку через расчётный счёт.",
+      "beta": -0.64325,
+      "iv": 0.2414
+    },
+    {
+      "name": "turnover_volatility",
+      "title": "Стабильность оборотов",
+      "source": "Обороты по расчётному счёту (АБС / выписка)",
+      "type": "numeric",
+      "unit": "коэф. вариации",
+      "bins": [
+        {
+          "lower": null,
+          "upper": 0.15,
+          "label": "стабильные",
+          "points": 93,
+          "woe": 1.0786,
+          "bad_rate": 0.0336,
+          "share": 0.2766
+        },
+        {
+          "lower": 0.15,
+          "upper": 0.3,
+          "label": "умеренные колебания",
+          "points": 58,
+          "woe": 0.1026,
+          "bad_rate": 0.0846,
+          "share": 0.3744
+        },
+        {
+          "lower": 0.3,
+          "upper": 0.5,
+          "label": "заметные колебания",
+          "points": 35,
+          "woe": -0.5104,
+          "bad_rate": 0.1457,
+          "share": 0.2492
+        },
+        {
+          "lower": 0.5,
+          "upper": null,
+          "label": "сильные колебания",
+          "points": 19,
+          "woe": -0.9532,
+          "bad_rate": 0.2096,
+          "share": 0.0483
+        }
+      ],
+      "missing": {
+        "label": "нет данных об оборотах",
+        "points": 48,
+        "woe": -0.1653,
+        "bad_rate": 0.1074,
+        "share": 0.0515
+      },
+      "max_points": 93,
+      "client_hint": "Равномерные поступления на счёт повышают оценку; сезонность можно пояснить в заявке.",
+      "beta": -0.6263,
+      "iv": 0.3588
+    },
+    {
+      "name": "debt_load",
+      "title": "Долговая нагрузка",
+      "source": "БКИ + параметры заявки",
+      "type": "numeric",
+      "unit": "доля платежей в выручке",
+      "bins": [
+        {
+          "lower": null,
+          "upper": 0.05,
+          "label": "до 5% выручки",
+          "points": 83,
+          "woe": 0.6973,
+          "bad_rate": 0.0484,
+          "share": 0.2127
+        },
+        {
+          "lower": 0.05,
+          "upper": 0.1,
+          "label": "5–10% выручки",
+          "points": 69,
+          "woe": 0.3528,
+          "bad_rate": 0.0671,
+          "share": 0.3221
+        },
+        {
+          "lower": 0.1,
+          "upper": 0.2,
+          "label": "10–20% выручки",
+          "points": 48,
+          "woe": -0.1369,
+          "bad_rate": 0.1051,
+          "share": 0.3461
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.3,
+          "label": "20–30% выручки",
+          "points": 23,
+          "woe": -0.7285,
+          "bad_rate": 0.1749,
+          "share": 0.0926
+        },
+        {
+          "lower": 0.3,
+          "upper": null,
+          "label": "более 30% выручки",
+          "points": -10,
+          "woe": -1.5189,
+          "bad_rate": 0.3184,
+          "share": 0.0265
+        }
+      ],
+      "missing": null,
+      "max_points": 83,
+      "client_hint": "Снизить нагрузку можно, уменьшив сумму, увеличив срок или погасив часть текущих кредитов.",
+      "beta": -0.73332,
+      "iv": 0.2938
+    },
+    {
+      "name": "company_max_overdue_days",
+      "title": "Просрочки компании за 24 мес.",
+      "source": "БКИ",
+      "type": "numeric",
+      "unit": "дней",
+      "bins": [
+        {
+          "lower": null,
+          "upper": 1,
+          "label": "нет просрочек",
+          "points": 88,
+          "woe": 0.8289,
+          "bad_rate": 0.0428,
+          "share": 0.6972
+        },
+        {
+          "lower": 1,
+          "upper": 30,
+          "label": "до 30 дней",
+          "points": 38,
+          "woe": -0.3963,
+          "bad_rate": 0.1321,
+          "share": 0.1889
+        },
+        {
+          "lower": 30,
+          "upper": 90,
+          "label": "30–89 дней",
+          "points": 4,
+          "woe": -1.2152,
+          "bad_rate": 0.2565,
+          "share": 0.0773
+        },
+        {
+          "lower": 90,
+          "upper": null,
+          "label": "90 дней и более",
+          "points": -39,
+          "woe": -2.2782,
+          "bad_rate": 0.5,
+          "share": 0.0367
+        }
+      ],
+      "missing": null,
+      "max_points": 88,
+      "client_hint": "Своевременные платежи по текущим кредитам — главный способ улучшить кредитную историю.",
+      "beta": -0.70493,
+      "iv": 0.965
+    },
+    {
+      "name": "owner_max_overdue_days",
+      "title": "Просрочки собственника за 24 мес.",
+      "source": "БКИ (поручитель)",
+      "type": "numeric",
+      "unit": "дней",
+      "bins": [
+        {
+          "lower": null,
+          "upper": 1,
+          "label": "нет просрочек",
+          "points": 77,
+          "woe": 0.6779,
+          "bad_rate": 0.0494,
+          "share": 0.7264
+        },
+        {
+          "lower": 1,
+          "upper": 30,
+          "label": "до 30 дней",
+          "points": 39,
+          "woe": -0.4356,
+          "bad_rate": 0.1366,
+          "share": 0.1826
+        },
+        {
+          "lower": 30,
+          "upper": 90,
+          "label": "30–89 дней",
+          "points": 9,
+          "woe": -1.3109,
+          "bad_rate": 0.2752,
+          "share": 0.0614
+        },
+        {
+          "lower": 90,
+          "upper": null,
+          "label": "90 дней и более",
+          "points": -25,
+          "woe": -2.3305,
+          "bad_rate": 0.5131,
+          "share": 0.0296
+        }
+      ],
+      "missing": null,
+      "max_points": 77,
+      "client_hint": "Кредитная история собственника учитывается через поручительство — проверьте её в БКИ.",
+      "beta": -0.58913,
+      "iv": 0.8141
+    },
+    {
+      "name": "bki_inquiries_30d",
+      "title": "Запросы кредитной истории за 30 дней",
+      "source": "БКИ",
+      "type": "numeric",
+      "unit": "шт.",
+      "bins": [
+        {
+          "lower": null,
+          "upper": 2,
+          "label": "0–1",
+          "points": 70,
+          "woe": 0.5334,
+          "bad_rate": 0.0567,
+          "share": 0.5926
+        },
+        {
+          "lower": 2,
+          "upper": 4,
+          "label": "2–3",
+          "points": 44,
+          "woe": -0.3296,
+          "bad_rate": 0.1246,
+          "share": 0.3205
+        },
+        {
+          "lower": 4,
+          "upper": 7,
+          "label": "4–6",
+          "points": 25,
+          "woe": -0.9463,
+          "bad_rate": 0.2086,
+          "share": 0.0827
+        },
+        {
+          "lower": 7,
+          "upper": null,
+          "label": "7 и более",
+          "points": -17,
+          "woe": -2.306,
+          "bad_rate": 0.507,
+          "share": 0.0042
+        }
+      ],
+      "missing": null,
+      "max_points": 70,
+      "client_hint": "Много одновременных заявок в разные банки снижает оценку — подавайте заявки адресно.",
+      "beta": -0.53384,
+      "iv": 0.3319
+    },
+    {
+      "name": "tax_arrears_ratio",
+      "title": "Налоговая задолженность",
+      "source": "ФНС «Прозрачный бизнес»",
+      "type": "numeric",
+      "unit": "к месячной выручке",
+      "bins": [
+        {
+          "lower": null,
+          "upper": 0.0001,
+          "label": "нет задолженности",
+          "points": 64,
+          "woe": 0.2276,
+          "bad_rate": 0.0754,
+          "share": 0.8674
+        },
+        {
+          "lower": 0.0001,
+          "upper": 0.1,
+          "label": "до 10% мес. выручки",
+          "points": 15,
+          "woe": -0.9063,
+          "bad_rate": 0.2021,
+          "share": 0.0954
+        },
+        {
+          "lower": 0.1,
+          "upper": null,
+          "label": "более 10% мес. выручки",
+          "points": 10,
+          "woe": -1.0198,
+          "bad_rate": 0.2208,
+          "share": 0.0372
+        }
+      ],
+      "missing": null,
+      "max_points": 64,
+      "client_hint": "Погасите задолженность по налогам и пеням — после обновления данных ФНС оценка вырастет.",
+      "beta": -0.73943,
+      "iv": 0.2111
+    },
+    {
+      "name": "industry_risk",
+      "title": "Отраслевой риск (ОКВЭД)",
+      "source": "ЕГРЮЛ / ЕГРИП",
+      "type": "categorical",
+      "bins": [
+        {
+          "value": "low",
+          "label": "низкий",
+          "points": 78,
+          "woe": 0.2906,
+          "bad_rate": 0.0711,
+          "share": 0.2989
+        },
+        {
+          "value": "medium",
+          "label": "средний",
+          "points": 55,
+          "woe": 0.0125,
+          "bad_rate": 0.0918,
+          "share": 0.4524
+        },
+        {
+          "value": "high",
+          "label": "повышенный",
+          "points": 30,
+          "woe": -0.2971,
+          "bad_rate": 0.1211,
+          "share": 0.2487
+        }
+      ],
+      "max_points": 78,
+      "client_hint": "Отраслевой риск не зависит от вас; его компенсируют обеспечение и стабильные обороты.",
+      "beta": -1.41699,
+      "iv": 0.0473
+    },
+    {
+      "name": "bank_relationship_months",
+      "title": "История обслуживания в банке",
+      "source": "АБС банка",
+      "type": "numeric",
+      "unit": "мес.",
+      "bins": [
+        {
+          "lower": null,
+          "upper": 1,
+          "label": "не клиент банка",
+          "points": 49,
+          "woe": -0.1381,
+          "bad_rate": 0.1052,
+          "share": 0.451
+        },
+        {
+          "lower": 1,
+          "upper": 12,
+          "label": "до 1 года",
+          "points": 43,
+          "woe": -0.3316,
+          "bad_rate": 0.1247,
+          "share": 0.0926
+        },
+        {
+          "lower": 12,
+          "upper": 36,
+          "label": "1–3 года",
+          "points": 54,
+          "woe": 0.0198,
+          "bad_rate": 0.0912,
+          "share": 0.2096
+        },
+        {
+          "lower": 36,
+          "upper": null,
+          "label": "более 3 лет",
+          "points": 69,
+          "woe": 0.4706,
+          "bad_rate": 0.06,
+          "share": 0.2468
+        }
+      ],
+      "missing": null,
+      "max_points": 69,
+      "client_hint": "Обслуживание расчётного счёта в банке даёт данные об оборотах и повышает оценку.",
+      "beta": -0.57102,
+      "iv": 0.066
+    }
+  ],
+  "grades": [
+    {
+      "grade": "A",
+      "title": "Минимальный риск",
+      "pd_from": 0.0,
+      "pd_to": 0.02,
+      "min_score": 628.3
+    },
+    {
+      "grade": "B",
+      "title": "Низкий риск",
+      "pd_from": 0.02,
+      "pd_to": 0.04,
+      "min_score": 587.1
+    },
+    {
+      "grade": "C",
+      "title": "Умеренный риск",
+      "pd_from": 0.04,
+      "pd_to": 0.08,
+      "min_score": 544.7
+    },
+    {
+      "grade": "D",
+      "title": "Повышенный риск",
+      "pd_from": 0.08,
+      "pd_to": 0.15,
+      "min_score": 503.8
+    },
+    {
+      "grade": "E",
+      "title": "Высокий риск",
+      "pd_from": 0.15,
+      "pd_to": 1.0,
+      "min_score": null
+    }
+  ],
+  "metrics": {
+    "gini_train": 0.7162,
+    "gini_test": 0.7178,
+    "gini_oot": 0.7368,
+    "ks_test": 0.5653,
+    "ks_oot": 0.5731,
+    "default_rate_train": 0.0929,
+    "default_rate_test": 0.0929,
+    "default_rate_oot": 0.1078,
+    "n_train": 16800,
+    "n_test": 7200,
+    "n_oot": 6000,
+    "psi_score_test": 0.0013,
+    "psi_score_oot": 0.032
+  },
+  "calibration": {
+    "test": [
+      {
+        "grade": "A",
+        "n": 2689,
+        "share": 0.3735,
+        "pd_expected": 0.0106,
+        "dr_observed": 0.0115,
+        "binom_p_value": 0.6366
+      },
+      {
+        "grade": "B",
+        "n": 1328,
+        "share": 0.1844,
+        "pd_expected": 0.0284,
+        "dr_observed": 0.0339,
+        "binom_p_value": 0.2467
+      },
+      {
+        "grade": "C",
+        "n": 1166,
+        "share": 0.1619,
+        "pd_expected": 0.0565,
+        "dr_observed": 0.0566,
+        "binom_p_value": 0.9494
+      },
+      {
+        "grade": "D",
+        "n": 790,
+        "share": 0.1097,
+        "pd_expected": 0.1115,
+        "dr_observed": 0.1177,
+        "binom_p_value": 0.572
+      },
+      {
+        "grade": "E",
+        "n": 1227,
+        "share": 0.1704,
+        "pd_expected": 0.3485,
+        "dr_observed": 0.3537,
+        "binom_p_value": 0.697
+      }
+    ],
+    "oot": [
+      {
+        "grade": "A",
+        "n": 1755,
+        "share": 0.2925,
+        "pd_expected": 0.011,
+        "dr_observed": 0.0108,
+        "binom_p_value": 1.0
+      },
+      {
+        "grade": "B",
+        "n": 1116,
+        "share": 0.186,
+        "pd_expected": 0.0288,
+        "dr_observed": 0.0161,
+        "binom_p_value": 0.0091
+      },
+      {
+        "grade": "C",
+        "n": 1057,
+        "share": 0.1762,
+        "pd_expected": 0.0566,
+        "dr_observed": 0.0577,
+        "binom_p_value": 0.8417
+      },
+      {
+        "grade": "D",
+        "n": 785,
+        "share": 0.1308,
+        "pd_expected": 0.1101,
+        "dr_observed": 0.1172,
+        "binom_p_value": 0.5303
+      },
+      {
+        "grade": "E",
+        "n": 1287,
+        "share": 0.2145,
+        "pd_expected": 0.373,
+        "dr_observed": 0.3551,
+        "binom_p_value": 0.1946
+      }
+    ]
+  },
+  "feature_psi_oot": {
+    "business_age_months": 0.0209,
+    "annual_revenue_mln": 0.0013,
+    "turnover_volatility": 0.0008,
+    "debt_load": 0.1086,
+    "company_max_overdue_days": 0.0009,
+    "owner_max_overdue_days": 0.0002,
+    "bki_inquiries_30d": 0.0907,
+    "tax_arrears_ratio": 0.0012,
+    "industry_risk": 0.0014,
+    "bank_relationship_months": 0.0084
+  },
+  "intercept": -2.334642
+}
