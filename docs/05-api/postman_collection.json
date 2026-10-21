@@ -1,0 +1,2768 @@
+{
+  "info": {
+    "name": "Умный кредитный кабинет — API",
+    "_postman_id": "8a5c7d4e-2f61-4c7b-9a1e-credit-cabinet",
+    "description": "Сценарии S1 и S2 проходят путь заявки целиком; папка «Все методы» сгенерирована из OpenAPI.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "password",
+      "value": "Demo-2026"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "company_id",
+      "value": ""
+    },
+    {
+      "key": "app_id",
+      "value": ""
+    },
+    {
+      "key": "version",
+      "value": ""
+    },
+    {
+      "key": "poll",
+      "value": "0"
+    }
+  ],
+  "item": [
+    {
+      "name": "Сценарий S1: экспресс-кредит от заявки до выдачи",
+      "item": [
+        {
+          "name": "Вход: anna@kofe.test",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/auth/login",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"anna@kofe.test\",\n  \"password\": \"{{password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('вход выполнен', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Профиль и компания",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/auth/me",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const me = pm.response.json();",
+                  "pm.test('есть компания', () => pm.expect(me.companies.length).to.be.above(0));",
+                  "pm.collectionVariables.set('company_id', me.companies[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Подбор продукта",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/products/recommend",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "recommend"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company_id\": \"{{company_id}}\",\n  \"purpose\": \"equipment\",\n  \"amount\": 1500000,\n  \"term_months\": 24,\n  \"urgent\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('лучший — экспресс-кредит', () => pm.expect(pm.response.json().items[0].code).to.eql('EXPRESS'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Создать черновик (автозаполнение)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company_id\": \"{{company_id}}\",\n  \"product_code\": \"EXPRESS\",\n  \"amount\": 1500000,\n  \"term_months\": 24,\n  \"purpose\": \"equipment\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const a = pm.response.json();",
+                  "pm.test('черновик', () => pm.expect(a.status).to.eql('draft'));",
+                  "pm.test('выручка подставлена', () => pm.expect(a.form.financials.monthly_revenue).to.be.above(0));",
+                  "pm.collectionVariables.set('app_id', a.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Подписать (ПЭП) и отправить в банк",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications/{{app_id}}/submit",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{app_id}}",
+                "submit"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"{{password}}\",\n  \"consent_bki\": true,\n  \"consent_pd\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('отправлено', () => pm.expect(pm.response.json().status).to.eql('submitted'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ждём решение конвейера",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications/{{app_id}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{app_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "setTimeout(() => {}, 1500);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const st = pm.response.json().status;",
+                  "const target = [\"offer_issued\"];",
+                  "const n = Number(pm.collectionVariables.get('poll') || 0);",
+                  "if (!target.includes(st) && n < 60) { pm.collectionVariables.set('poll', n + 1); postman.setNextRequest(pm.info.requestName); }",
+                  "else { pm.collectionVariables.set('poll', 0); pm.test('статус ' + target.join('|'), () => pm.expect(target).to.include(st)); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Предложение",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications/{{app_id}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{app_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const o = pm.response.json().offer;",
+                  "pm.test('1 500 000 ₽ на 24 мес. под 21,5%', () => {",
+                  "  pm.expect(o.amount).to.eql(1500000); pm.expect(o.term_months).to.eql(24); pm.expect(o.rate).to.eql(21.5); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Принять предложение",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications/{{app_id}}/offer/accept",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{app_id}}",
+                "offer",
+                "accept"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('принято', () => pm.expect(pm.response.json().status).to.eql('offer_accepted'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Подписать договор",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications/{{app_id}}/contract/sign",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{app_id}}",
+                "contract",
+                "sign"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"{{password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('выдача', () => pm.expect(pm.response.json().status).to.eql('disbursement'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ждём выдачу",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications/{{app_id}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{app_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "setTimeout(() => {}, 1500);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const st = pm.response.json().status;",
+                  "const target = [\"issued\"];",
+                  "const n = Number(pm.collectionVariables.get('poll') || 0);",
+                  "if (!target.includes(st) && n < 60) { pm.collectionVariables.set('poll', n + 1); postman.setNextRequest(pm.info.requestName); }",
+                  "else { pm.collectionVariables.set('poll', 0); pm.test('статус ' + target.join('|'), () => pm.expect(target).to.include(st)); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Сценарий S2: бухгалтер → директор → аналитик → комитет",
+      "item": [
+        {
+          "name": "Вход: irina@technostroy.test",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/auth/login",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"irina@technostroy.test\",\n  \"password\": \"{{password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('вход выполнен', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Профиль и компания",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/auth/me",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const me = pm.response.json();",
+                  "pm.test('есть компания', () => pm.expect(me.companies.length).to.be.above(0));",
+                  "pm.collectionVariables.set('company_id', me.companies[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Создать заявку на 40 млн ₽",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company_id\": \"{{company_id}}\",\n  \"product_code\": \"INVEST\",\n  \"amount\": 40000000,\n  \"term_months\": 60,\n  \"purpose\": \"equipment\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('app_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Указать залог",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications/{{app_id}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{app_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"collateral\": {\n    \"type\": \"real_estate\",\n    \"value\": 60000000,\n    \"description\": \"Производственный корпус\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Загрузить: financial_statements",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications/{{app_id}}/documents",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{app_id}}",
+                "documents"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "doc_type",
+                  "value": "financial_statements",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "test-data/documents/financial_statements_technostroy.pdf"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('загружено', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Загрузить: collateral_docs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications/{{app_id}}/documents",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{app_id}}",
+                "documents"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "doc_type",
+                  "value": "collateral_docs",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "test-data/documents/collateral_egrn_technostroy.pdf"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('загружено', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Загрузить: purchase_contract",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications/{{app_id}}/documents",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{app_id}}",
+                "documents"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "doc_type",
+                  "value": "purchase_contract",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "test-data/documents/purchase_contract_technostroy.pdf"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('загружено', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Бухгалтер не может подписать",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications/{{app_id}}/submit",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{app_id}}",
+                "submit"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"{{password}}\",\n  \"consent_bki\": true,\n  \"consent_pd\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 signer_required', () => pm.expect(pm.response.json().code).to.eql('signer_required'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Передать на подпись",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications/{{app_id}}/send-for-signature",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{app_id}}",
+                "send-for-signature"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ждёт подписи', () => pm.expect(pm.response.json().status).to.eql('pending_signature'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Вход: oleg@technostroy.test",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/auth/login",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"oleg@technostroy.test\",\n  \"password\": \"{{password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('вход выполнен', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Подписать (ПЭП) и отправить в банк",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications/{{app_id}}/submit",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{app_id}}",
+                "submit"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"{{password}}\",\n  \"consent_bki\": true,\n  \"consent_pd\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('отправлено', () => pm.expect(pm.response.json().status).to.eql('submitted'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ждём передачу специалисту",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications/{{app_id}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{app_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "setTimeout(() => {}, 1500);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const st = pm.response.json().status;",
+                  "const target = [\"manual_review\"];",
+                  "const n = Number(pm.collectionVariables.get('poll') || 0);",
+                  "if (!target.includes(st) && n < 60) { pm.collectionVariables.set('poll', n + 1); postman.setNextRequest(pm.info.requestName); }",
+                  "else { pm.collectionVariables.set('poll', 0); pm.test('статус ' + target.join('|'), () => pm.expect(target).to.include(st)); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Вход: analyst@bank.test",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/auth/login",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"analyst@bank.test\",\n  \"password\": \"{{password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('вход выполнен', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Досье",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/bank/applications/{{app_id}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bank",
+                "applications",
+                "{{app_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = pm.response.json();",
+                  "pm.test('рекомендация — одобрить', () => pm.expect(d.recommendation.outcome).to.eql('approve'));",
+                  "pm.collectionVariables.set('version', d.application.version);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Одобрить сверх полномочий — отказ",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/bank/applications/{{app_id}}/decision",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bank",
+                "applications",
+                "{{app_id}}",
+                "decision"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"approve\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 authority_exceeded', () => pm.expect(pm.response.json().code).to.eql('authority_exceeded'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Вынести на кредитный комитет",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/bank/applications/{{app_id}}/decision",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bank",
+                "applications",
+                "{{app_id}}",
+                "decision"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"escalate\",\n  \"comment\": \"Сумма выше полномочий аналитика\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('на комитете', () => pm.expect(pm.response.json().application.status).to.eql('committee_review'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Вход: risk@bank.test",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/auth/login",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"risk@bank.test\",\n  \"password\": \"{{password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('вход выполнен', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Решение комитета: одобрить",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/bank/applications/{{app_id}}/decision",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bank",
+                "applications",
+                "{{app_id}}",
+                "decision"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"approve\",\n  \"comment\": \"Одобрено\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('предложение', () => pm.expect(pm.response.json().application.status).to.eql('offer_issued'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Вход: oleg@technostroy.test",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/auth/login",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"oleg@technostroy.test\",\n  \"password\": \"{{password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('вход выполнен', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Предложение директору",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/v1/applications/{{app_id}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{app_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const o = pm.response.json().offer;",
+                  "pm.test('40 млн ₽, 60 мес., 18,5%', () => {",
+                  "  pm.expect(o.amount).to.eql(40000000); pm.expect(o.term_months).to.eql(60); pm.expect(o.rate).to.eql(18.5); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Все методы",
+      "item": [
+        {
+          "name": "Служебные",
+          "item": [
+            {
+              "name": "GET /api/health/live — Процесс жив",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base}}/api/health/live",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "health",
+                    "live"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "GET /api/health/ready — Готовность: БД и симулятор внешних систем",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base}}/api/health/ready",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "health",
+                    "ready"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/meta/state-machine — Статусы, переходы и шаги маршрута",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/meta/state-machine",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "meta",
+                    "state-machine"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/meta/dictionaries — Справочники для интерфейса",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/meta/dictionaries",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "meta",
+                    "dictionaries"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Аутентификация",
+          "item": [
+            {
+              "name": "POST /api/v1/auth/login — Вход по e-mail и паролю",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/auth/login",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "login"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/auth/logout — Выход (запись в журнал аудита)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/auth/logout",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "logout"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/auth/me — Текущий пользователь и его компании",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/auth/me",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "me"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/auth/demo-accounts — Тестовые учётные записи (только в DEMO_MODE)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/auth/demo-accounts",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "demo-accounts"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Кабинет клиента",
+          "item": [
+            {
+              "name": "POST /api/v1/companies — Подключить компанию по ИНН (данные из ЕГРЮЛ/ЕГРИП)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/companies",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "companies"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/companies/{company_id} — Карточка компании, предодобренные предложения, сводка",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/companies/{{company_id}}",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "companies",
+                    "{{company_id}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/products — Каталог продуктов (с доступностью для компании)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/products",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "products"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/products/recommend — Подбор продукта под задачу клиента с объяснением",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/products/recommend",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "products",
+                    "recommend"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/calculator — Кредитный калькулятор: платёж, переплата, график",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/calculator",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "calculator"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/applications — Заявки компаний пользователя",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/applications — Создать черновик заявки (с автозаполнением)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/applications/{app_id} — Заявка: статус, маршрут, анкета, задачи, предложение",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications/{{app_id}}",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications",
+                    "{{app_id}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "PATCH /api/v1/applications/{app_id} — Изменить анкету черновика (автосохранение)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications/{{app_id}}",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications",
+                    "{{app_id}}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/applications/{app_id}/documents — Загрузить документ",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications/{{app_id}}/documents",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications",
+                    "{{app_id}}",
+                    "documents"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "DELETE /api/v1/applications/{app_id}/documents/{doc_id} — Удалить документ (до отправки)",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications/{{app_id}}/documents/{{doc_id}}",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications",
+                    "{{app_id}}",
+                    "documents",
+                    "{{doc_id}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/applications/{app_id}/documents/{doc_id}/file — Скачать документ",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications/{{app_id}}/documents/{{doc_id}}/file",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications",
+                    "{{app_id}}",
+                    "documents",
+                    "{{doc_id}}",
+                    "file"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/applications/{app_id}/send-for-signature — Передать заявку на подпись руководителю",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications/{{app_id}}/send-for-signature",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications",
+                    "{{app_id}}",
+                    "send-for-signature"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/applications/{app_id}/return-to-draft — Вернуть заявку на доработку",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications/{{app_id}}/return-to-draft",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications",
+                    "{{app_id}}",
+                    "return-to-draft"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/applications/{app_id}/submit — Подписать (ПЭП) согласия и заявку, отправить в банк",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications/{{app_id}}/submit",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications",
+                    "{{app_id}}",
+                    "submit"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/applications/{app_id}/cancel — Отозвать заявку",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications/{{app_id}}/cancel",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications",
+                    "{{app_id}}",
+                    "cancel"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/applications/{app_id}/tasks/{task_id}/answer — Ответить на вопрос банка",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications/{{app_id}}/tasks/{{task_id}}/answer",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications",
+                    "{{app_id}}",
+                    "tasks",
+                    "{{task_id}}",
+                    "answer"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/applications/{app_id}/resume — Вернуть заявку в работу после уточнений",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications/{{app_id}}/resume",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications",
+                    "{{app_id}}",
+                    "resume"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/applications/{app_id}/offer/accept — Принять кредитное предложение",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications/{{app_id}}/offer/accept",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications",
+                    "{{app_id}}",
+                    "offer",
+                    "accept"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/applications/{app_id}/offer/decline — Отказаться от предложения",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications/{{app_id}}/offer/decline",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications",
+                    "{{app_id}}",
+                    "offer",
+                    "decline"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/applications/{app_id}/contract — Кредитный договор по принятому предложению (HTML)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications/{{app_id}}/contract",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications",
+                    "{{app_id}}",
+                    "contract"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/applications/{app_id}/contract/sign — Подписать кредитный договор (ПЭП)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/applications/{{app_id}}/contract/sign",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "applications",
+                    "{{app_id}}",
+                    "contract",
+                    "sign"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/loans — Действующие кредиты компаний пользователя",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/loans",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "loans"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/notifications — Уведомления в кабинете",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/notifications",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "notifications"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/notifications/read-all — Отметить все уведомления прочитанными",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/notifications/read-all",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "notifications",
+                    "read-all"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/notifications/{notification_id}/read — Отметить уведомление прочитанным",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/notifications/{{notification_id}}/read",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "notifications",
+                    "{{notification_id}}",
+                    "read"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/feed — Персональная лента новостей и подсказок",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/feed",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "feed"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/feed/actions — Реакция на карточку ленты (обучение интересов)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/feed/actions",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "feed",
+                    "actions"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "PUT /api/v1/feed/topics — Выбрать интересующие темы",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/feed/topics",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "feed",
+                    "topics"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/assistant — Вопрос помощнику (база знаний + данные заявки)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/assistant",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "assistant"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/demo/sample-statement/{company_id} — Демо: синтетическая выписка 1С для компании",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/demo/sample-statement/{{company_id}}",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "demo",
+                    "sample-statement",
+                    "{{company_id}}"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Рабочее место банка",
+          "item": [
+            {
+              "name": "GET /api/v1/bank/queue — Очередь заявок с нормативами (SLA)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/bank/queue",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bank",
+                    "queue"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/bank/applications/{app_id} — Досье заявки: источники, скоринг, рекомендация, журнал",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/bank/applications/{{app_id}}",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bank",
+                    "applications",
+                    "{{app_id}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/bank/applications/{app_id}/assign — Взять заявку в работу",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/bank/applications/{{app_id}}/assign",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bank",
+                    "applications",
+                    "{{app_id}}",
+                    "assign"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/bank/applications/{app_id}/decision — Решение по заявке в рамках полномочий",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/bank/applications/{{app_id}}/decision",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bank",
+                    "applications",
+                    "{{app_id}}",
+                    "decision"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/bank/applications/{app_id}/memo — Черновик кредитного заключения",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/bank/applications/{{app_id}}/memo",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bank",
+                    "applications",
+                    "{{app_id}}",
+                    "memo"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/bank/documents/{doc_id}/review — Принять или отклонить документ",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/bank/documents/{{doc_id}}/review",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bank",
+                    "documents",
+                    "{{doc_id}}",
+                    "review"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/bank/documents/{doc_id}/file — Скачать документ клиента",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/bank/documents/{{doc_id}}/file",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bank",
+                    "documents",
+                    "{{doc_id}}",
+                    "file"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/bank/dashboard — Дашборд кредитного процесса",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/bank/dashboard",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bank",
+                    "dashboard"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/bank/policy — Действующая кредитная политика и история версий",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/bank/policy",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bank",
+                    "policy"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/bank/policy — Создать новую версию кредитной политики",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/bank/policy",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bank",
+                    "policy"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/bank/audit — Журнал аудита",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/bank/audit",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bank",
+                    "audit"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "GET /api/v1/bank/system — Мониторинг конвейера: очередь задач, повторы, отказы",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/bank/system",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bank",
+                    "system"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "POST /api/v1/bank/jobs/{job_id}/retry — Повторить задачу из «мёртвых писем»",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base}}/api/v1/bank/jobs/{{job_id}}/retry",
+                  "host": [
+                    "{{base}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "bank",
+                    "jobs",
+                    "{{job_id}}",
+                    "retry"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

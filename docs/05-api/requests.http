@@ -1,0 +1,116 @@
+# Запросы для REST Client (VS Code) / HTTP Client (JetBrains).
+# Сценарий S1 по шагам: вход → подбор → черновик → подпись → ожидание решения → предложение → договор.
+
+@base = http://localhost:8080
+@password = Demo-2026
+
+### Тестовые учётки
+GET {{base}}/api/v1/auth/demo-accounts
+
+### 1. Вход клиента
+# @name login
+POST {{base}}/api/v1/auth/login
+Content-Type: application/json
+
+{"email": "anna@kofe.test", "password": "{{password}}"}
+
+###
+@token = {{login.response.body.access_token}}
+
+### 2. Профиль и компания
+# @name me
+GET {{base}}/api/v1/auth/me
+Authorization: Bearer {{token}}
+
+###
+@company = {{me.response.body.companies[0].id}}
+
+### 3. Карточка компании и предодобренный лимит
+GET {{base}}/api/v1/companies/{{company}}
+Authorization: Bearer {{token}}
+
+### 4. Подбор под задачу
+POST {{base}}/api/v1/products/recommend
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"company_id": "{{company}}", "purpose": "equipment", "amount": 1500000, "term_months": 24, "urgent": true}
+
+### 5. Черновик с автозаполнением
+# @name draft
+POST {{base}}/api/v1/applications
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"company_id": "{{company}}", "product_code": "EXPRESS", "amount": 1500000, "term_months": 24, "purpose": "equipment"}
+
+###
+@app = {{draft.response.body.id}}
+
+### 6. Автосохранение анкеты
+PATCH {{base}}/api/v1/applications/{{app}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"purpose_text": "Кофемашина и холодильная витрина"}
+
+### 7. Подписать и отправить (повтор с тем же ключом вернёт сохранённый ответ)
+POST {{base}}/api/v1/applications/{{app}}/submit
+Authorization: Bearer {{token}}
+Content-Type: application/json
+Idempotency-Key: s1-submit-demo-0001
+
+{"password": "{{password}}", "consent_bki": true, "consent_pd": true}
+
+### 8. Статус (повторяйте 5–10 секунд до offer_issued)
+GET {{base}}/api/v1/applications/{{app}}
+Authorization: Bearer {{token}}
+
+### 9. Принять предложение
+POST {{base}}/api/v1/applications/{{app}}/offer/accept
+Authorization: Bearer {{token}}
+Idempotency-Key: s1-accept-demo-0001
+
+### 10. Договор (HTML)
+GET {{base}}/api/v1/applications/{{app}}/contract
+Authorization: Bearer {{token}}
+
+### 11. Подписать договор
+POST {{base}}/api/v1/applications/{{app}}/contract/sign
+Authorization: Bearer {{token}}
+Content-Type: application/json
+Idempotency-Key: s1-sign-demo-0001
+
+{"password": "{{password}}"}
+
+### 12. Кредиты и график
+GET {{base}}/api/v1/loans
+Authorization: Bearer {{token}}
+
+### ---------------------------------------------------------------- банк
+# @name analyst
+POST {{base}}/api/v1/auth/login
+Content-Type: application/json
+
+{"email": "analyst@bank.test", "password": "{{password}}"}
+
+###
+@bank = {{analyst.response.body.access_token}}
+
+### Очередь
+GET {{base}}/api/v1/bank/queue?status=active
+Authorization: Bearer {{bank}}
+
+### Дашборд
+GET {{base}}/api/v1/bank/dashboard?days=30
+Authorization: Bearer {{bank}}
+
+### ---------------------------------------------------------------- симулятор
+### Включить сбой БКИ на минуту
+POST http://localhost:8081/admin/faults
+Content-Type: application/json
+
+{"inn": "*", "source": "bki_company", "mode": "outage", "seconds": 60}
+
+### Сбросить состояние симулятора
+POST http://localhost:8081/admin/reset
