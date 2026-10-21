@@ -1,0 +1,136 @@
+# Умный кредитный кабинет предпринимателя — запуск одной командой:
+#
+#     docker compose up -d --build        →  http://localhost:8080
+#
+# Сервисы: db (PostgreSQL) → mocks (симулятор внешних систем) → migrate (миграции + тестовые данные,
+# один раз) → api (REST API) + worker ×2 (конвейер заявок) → web (интерфейс и прокси /api).
+# Необязательный профиль «ai»: локальная LLM с открытыми весами (docker compose --profile ai up -d).
+# Все переменные — со значениями по умолчанию; переопределяются в .env (см. .env.example).
+
+name: credit-cabinet
+
+x-backend-env: &backend-env
+  APP_ENV: ${APP_ENV:-development}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-credit}:${POSTGRES_PASSWORD:-credit}@db:5432/${POSTGRES_DB:-credit}
+  JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-before-deploy}
+  JWT_TTL_MINUTES: ${JWT_TTL_MINUTES:-480}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+  INTEGRATIONS_BASE_URL: http://mocks:8081
+  INTEGRATION_TIMEOUT_SEC: ${INTEGRATION_TIMEOUT_SEC:-3}
+  INTEGRATION_RETRIES: ${INTEGRATION_RETRIES:-2}
+  STORAGE_DIR: /data/uploads
+  MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
+  PIPELINE_STEP_DELAY_SEC: ${PIPELINE_STEP_DELAY_SEC:-1.2}
+  DEMO_MODE: ${DEMO_MODE:-true}
+  SEED_HISTORY: ${SEED_HISTORY:-60}
+  LLM_PROVIDER: ${LLM_PROVIDER:-none}
+  LLM_BASE_URL: ${LLM_BASE_URL:-http://ollama:11434/v1}
+  LLM_MODEL: ${LLM_MODEL:-qwen2.5:1.5b-instruct}
+
+x-backend: &backend
+  build: ./backend
+  image: credit-cabinet-backend:1.0.0
+  environment: *backend-env
+  volumes:
+    - uploads:/data/uploads
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:16.10-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-credit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-credit}
+      POSTGRES_DB: ${POSTGRES_DB:-credit}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  mocks:
+    build: ./mocks
+    image: credit-cabinet-mocks:1.0.0
+    environment:
+      MOCK_LATENCY_SCALE: ${MOCK_LATENCY_SCALE:-1}   # множитель задержек источников (0 — без задержек)
+      MOCK_ERROR_RATE: ${MOCK_ERROR_RATE:-0}         # доля случайных сбоев 0..1 для проверки устойчивости
+    ports:
+      - "${MOCKS_PORT:-8081}:8081"   # для демонстрации сбоев: POST /admin/faults
+    restart: unless-stopped
+
+  migrate:
+    <<: *backend
+    command: ["sh", "-c", "alembic upgrade head && python -m app.seed"]
+    healthcheck:
+      disable: true
+    depends_on:
+      db:
+        condition: service_healthy
+      mocks:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *backend
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mocks:
+        condition: service_healthy
+
+  worker:
+    <<: *backend
+    command: ["python", "-m", "app.worker"]
+    deploy:
+      replicas: 2
+    healthcheck:
+      disable: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mocks:
+        condition: service_healthy
+
+  web:
+    build: ./frontend
+    image: credit-cabinet-web:1.0.0
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # --- необязательно: локальная LLM с открытыми весами для помощника и черновика заключения
+  ollama:
+    image: ollama/ollama:0.6.8
+    profiles: ["ai"]
+    volumes:
+      - ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  # однократно скачивает модель (≈1 ГБ) в том ollama; повторные запуски берут её из тома
+  ollama-pull:
+    image: ollama/ollama:0.6.8
+    profiles: ["ai"]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["ollama", "pull", "${LLM_MODEL:-qwen2.5:1.5b-instruct}"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  pgdata:
+  uploads:
+  ollama:

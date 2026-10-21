@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://credit:credit@localhost:5432/credit"
     db_pool_size: int = 10
 
-    jwt_secret: str = "dev-only-secret-change-me"
+    jwt_secret: str = "dev-only-secret-change-me-before-deploy"
     jwt_ttl_minutes: int = 480
     cors_origins: str = "http://localhost:5173,http://localhost:8080"
 

@@ -43,6 +43,7 @@ _h = logging.StreamHandler(sys.stdout)
 _h.setFormatter(logging.Formatter("%(message)s"))
 log.addHandler(_h)
 log.setLevel(logging.INFO)
+log.propagate = False
 
 _lock = threading.Lock()
 STATE: dict[str, Any] = {
@@ -111,8 +112,8 @@ def simulate(source: str, inn: str, request: Request) -> None:
         log.info(json.dumps(entry, ensure_ascii=False))
 
 
-def _account(inn: str, kind: str = "settlement") -> str:
-    rng = rng_for(inn, kind)
+def _account(inn: str, kind: str = "settlement", salt: str = "") -> str:
+    rng = rng_for(inn + salt, kind)
     prefix = {"settlement": "40802810" if len(inn) == 12 else "40702810", "loan": "45507810" if len(inn) == 12 else "45207810"}[kind]
     return prefix + "".join(str(rng.randint(0, 9)) for _ in range(12))
 
@@ -274,7 +275,7 @@ def abs_loan(body: LoanRequest, request: Request, idempotency_key: str | None = 
     simulate("abs_disburse", body.inn, request)
     r = body.rate / 1200
     payment = body.amount * r / (1 - (1 + r) ** -body.term_months) if r else body.amount / body.term_months
-    res = {"status": "issued", "contract_number": body.contract_number, "loan_account": _account(body.inn + body.contract_number, "loan"),
+    res = {"status": "issued", "contract_number": body.contract_number, "loan_account": _account(body.inn, "loan", body.contract_number),
            "settlement_account": body.settlement_account or _account(body.inn),
            "abs_reference": f"ABS-{uuid.uuid4().hex[:12].upper()}", "issued_at": datetime.now(UTC).isoformat(),
            "amount": body.amount}
