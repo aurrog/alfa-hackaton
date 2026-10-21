@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+# Node
+node_modules/
+frontend/dist/
+# Окружение и данные
+.env
+data/
+*.log
+ml/data/*.csv
+# IDE
+.idea/
+.vscode/
+.DS_Store
