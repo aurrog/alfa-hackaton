@@ -22,7 +22,7 @@ from app.api.serializers import (
     product_out,
 )
 from app.config import get_settings
-from app.domain.calculator import loan_summary, schedule
+from app.domain.calculator import annuity_payment, loan_summary, schedule
 from app.domain.products import PURPOSES, Need, eligibility, recommend
 from app.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from app.integrations.client import http_client
@@ -112,8 +112,13 @@ def recommend_products(body: RecommendIn, db: DB, user: CurrentUser):
     recs = recommend([product_spec(p) for p in products], need, company_profile(c, it["avg_monthly"] if it else None),
                      float(policy["key_rate"]), {o["product_code"]: o["max_amount"] for o in pre}, today())
     by_code = {p.code: p for p in products}
+    discount = float(policy["discount_bank_client"]) if company_profile(c).bank_client_months >= 12 else 0.0
     for r in recs:
         p = by_code[r["code"]]
+        if discount and p.rate_mode != "key_rate":  # «ставка от» — с учётом скидки клиенту банка
+            r["rate_from"] = round(r["rate_from"] - discount, 2)
+            r["monthly_payment_from"] = round(annuity_payment(r["amount"], r["rate_from"], r["term_months"]) if p.kind == "term_loan"
+                                              else r["amount"] * r["rate_from"] / 1200, 2)
         r.update({"tagline": p.tagline, "kind": p.kind, "decision_time": p.decision_time, "features": p.features or [],
                   "min_term": p.min_term, "max_term": p.max_term, "min_amount": float(p.min_amount),
                   "max_amount": float(p.max_amount), "gov_program": p.gov_program})

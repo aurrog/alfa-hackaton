@@ -246,6 +246,8 @@ def _spread_in_time(factory: sessionmaker, rng: random.Random, ids: list[uuid.UU
                 "AND transition IN ('analyst_offer','analyst_decline','escalate','committee_offer','committee_decline')"),
                 {"id": app_id}).scalar()
             _shift(session, app_id, delta)
+            # автоматическая обработка в истории шла без пауз — восстанавливаем реалистичную длительность этапов
+            _shift(session, app_id, rng.uniform(25, 90), after=target + timedelta(seconds=1))
             if manual_point is not None:  # ручное решение — через несколько часов после поступления
                 _shift(session, app_id, rng.uniform(1.5, 7.5) * 3600, after=manual_point + timedelta(seconds=delta - 0.001))
             session.commit()

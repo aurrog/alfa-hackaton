@@ -414,10 +414,13 @@ def dashboard(session: Session, user: User, days: int = 30) -> dict:
     decided = list(final_by_app.values())
     approved = [d for d in decided if d.outcome in ("approve", "counter_offer")]
     auto = [d for d in decided if d.level == "auto"]
-    ttd = []
+    ttd, ttd_auto, ttd_manual = [], [], []
     for a in submitted:
         if a.decided_at and a.submitted_at:
-            ttd.append((a.decided_at - a.submitted_at).total_seconds() / 60)
+            sec = (a.decided_at - a.submitted_at).total_seconds()
+            ttd.append(sec / 60)
+            fin = final_by_app.get(a.id)
+            (ttd_auto if fin is not None and fin.level == "auto" else ttd_manual).append(sec)
     issued = session.execute(select(Loan).where(Loan.issued_at >= since)).scalars().all()
     breached = session.execute(select(func.count()).select_from(Application).where(
         Application.status.in_([s.value for s in ACTIVE_BANK_STATUSES]), Application.sla_due_at < now)).scalar()
@@ -467,6 +470,8 @@ def dashboard(session: Session, user: User, days: int = 30) -> dict:
             "approval_rate": round(len(approved) / len(decided), 3) if decided else None,
             "auto_decision_rate": round(len(auto) / len(decided), 3) if decided else None,
             "median_time_to_decision_min": round(statistics.median(ttd), 1) if ttd else None,
+            "median_auto_decision_sec": round(statistics.median(ttd_auto)) if ttd_auto else None,
+            "median_manual_decision_hours": round(statistics.median(ttd_manual) / 3600, 1) if ttd_manual else None,
             "issued_count": len(issued),
             "issued_amount": round(sum(float(lo.amount) for lo in issued), 2),
             "in_manual_review": by_status.get("manual_review", 0) + by_status.get("committee_review", 0),

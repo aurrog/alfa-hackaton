@@ -303,8 +303,10 @@ def s5(base: str, mocks: str) -> str:
     check(next(t for t in app["tasks"] if t["id"] == task["id"])["status"] == "answered", "задача не закрылась загрузкой")
     elena.post(f"/api/v1/applications/{app['id']}/resume")
     app = elena.wait(app["id"], {"offer_issued"})
-    return (f"{app['number']}: запрос выписки → 1С разобрана ({st['months_covered']} мес., {st['avg_monthly_incoming']:,.0f} ₽/мес) "
-            f"→ одобрено {app['offer']['amount']:,.0f} ₽ под {app['offer']['rate']}%").replace(",", " ")
+    avg = f"{st['avg_monthly_incoming']:,.0f}".replace(",", " ")
+    amount = f"{app['offer']['amount']:,.0f}".replace(",", " ")
+    rate = str(app["offer"]["rate"]).replace(".", ",")
+    return f"{app['number']}: запрос выписки → 1С разобрана ({st['months_covered']} мес., {avg} ₽/мес) → одобрено {amount} ₽ под {rate}%"
 
 
 def s6(base: str, mocks: str) -> str:
