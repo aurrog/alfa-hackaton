@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Бэкенд — линтер, тесты, актуальность документации
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16.10-alpine
+        env:
+          POSTGRES_USER: credit
+          POSTGRES_PASSWORD: credit
+          POSTGRES_DB: credit_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U credit" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL_TEST: postgresql+psycopg://credit:credit@localhost:5432/credit_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Зависимости (с проверкой хэшей)
+        run: pip install --require-hashes --no-deps -r backend/requirements-dev.lock
+      - name: Линтер
+        working-directory: backend
+        run: ruff check --config pyproject.toml app tests scripts ../mocks ../tests/e2e
+      - name: Модульные и интеграционные тесты
+        working-directory: backend
+        run: python -m pytest -p no:logging --junitxml=../test-results.xml
+      - name: OpenAPI, коллекция и диаграммы соответствуют коду
+        run: python backend/scripts/gen_docs.py --check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-results
+          path: test-results.xml
+
+  frontend:
+    name: Интерфейс — типы и сборка
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - working-directory: frontend
+        run: npm ci --no-audit --no-fund && npm run build
+
+  e2e:
+    name: Сквозные сценарии на стенде docker compose
+    runs-on: ubuntu-24.04
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Сборка и запуск одной командой
+        run: docker compose up -d --build
+      - name: Ожидание готовности
+        run: |
+          for i in $(seq 1 120); do
+            curl -fsS http://localhost:8080/api/health/ready && exit 0
+            sleep 5
+          done
+          docker compose ps; exit 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Сценарии S1–S8 через API
+        run: |
+          pip install httpx==0.28.1
+          python tests/e2e/run_scenarios.py --base http://localhost:8080 --mocks http://localhost:8081
+      - name: Коллекция Postman (newman)
+        run: |
+          curl -fsS -X POST http://localhost:8081/admin/reset
+          npx -y newman@6 run docs/05-api/postman_collection.json --working-dir . \
+            --folder "Сценарий S1: экспресс-кредит от заявки до выдачи" \
+            --folder "Сценарий S2: бухгалтер → директор → аналитик → комитет"
+      - name: Журналы при сбое
+        if: failure()
+        run: docker compose logs --no-color --tail 300
+      - name: Остановка
+        if: always()
+        run: docker compose down -v
