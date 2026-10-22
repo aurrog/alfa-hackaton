@@ -11,7 +11,8 @@
 
   Что делает: создаёт базу credit, ставит зависимости (Python — по lock-файлам с проверкой хэшей,
   npm — по package-lock.json), применяет миграции и тестовые данные и запускает в фоне:
-  симулятор :8081, API :8000, два воркера конвейера, интерфейс :5173. Журналы — в папке .run.
+  симулятор :8081, API :8000, два воркера конвейера, интерфейс :5173 (если порт занят — первый свободный
+  из 5180–5199). Журналы — в папке .run.
   Остановить — scripts\windows\stop.cmd.
 #>
 param(
@@ -27,28 +28,57 @@ New-Item -ItemType Directory -Force -Path $RunDir | Out-Null
 $PidFile = Join-Path $RunDir 'pids.txt'
 
 function Step([string]$text) { Write-Host ''; Write-Host "==> $text" -ForegroundColor Cyan }
-function Fail([string]$text) {
+function Show-Log([string]$name) {
+    # последние строки журналов сервиса — чтобы причина была видна сразу, без поиска файлов
+    foreach ($f in @("$name.err.log", "$name.log")) {
+        $path = Join-Path $RunDir $f
+        if ((Test-Path $path) -and (Get-Item $path).Length -gt 0) {
+            Write-Host ''
+            Write-Host "--- .run\$f (последние строки) ---" -ForegroundColor Yellow
+            Get-Content $path -Tail 25 -Encoding UTF8 | ForEach-Object { Write-Host "    $_" }
+        }
+    }
+}
+function Fail([string]$text, [string]$log = '') {
+    if ($log) { Show-Log $log }
     Write-Host ''
     Write-Host "ОШИБКА: $text" -ForegroundColor Red
     exit 1
 }
-function Wait-Http([string]$url, [int]$seconds) {
+function Wait-Http([string]$url, [int]$seconds, $proc = $null) {
     $deadline = (Get-Date).AddSeconds($seconds)
     while ((Get-Date) -lt $deadline) {
         try {
             $r = Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 3
             if ($r.StatusCode -eq 200) { return $true }
         } catch { }
+        if ($proc -and $proc.HasExited) { return $false }   # процесс упал — ждать дальше бессмысленно
         Start-Sleep -Milliseconds 700
     }
     return $false
+}
+function Test-PortFree([int]$port) {
+    # порт может быть занят другой программой или зарезервирован Windows (excludedportrange) — проверяем, что слушать можно
+    foreach ($addr in @([System.Net.IPAddress]::Loopback, [System.Net.IPAddress]::Any)) {
+        try {
+            $l = New-Object System.Net.Sockets.TcpListener($addr, $port)
+            $l.Start(); $l.Stop()
+        } catch { return $false }
+    }
+    return $true
+}
+function Find-FreePort([int[]]$candidates) {
+    foreach ($p in $candidates) { if (Test-PortFree $p) { return $p } }
+    return 0
 }
 function Start-Service2([string]$name, [string]$exe, [string[]]$argList, [string]$dir) {
     $out = Join-Path $RunDir "$name.log"
     $err = Join-Path $RunDir "$name.err.log"
     $p = Start-Process -FilePath $exe -ArgumentList $argList -WorkingDirectory $dir -WindowStyle Hidden `
         -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
-    Add-Content -Path $PidFile -Value $p.Id
+    $ticks = 0
+    try { $ticks = $p.StartTime.ToUniversalTime().Ticks } catch { }
+    Add-Content -Path $PidFile -Value "$($p.Id);$ticks"
     Write-Host "    $name запущен (PID $($p.Id)), журнал: .run\$name.log"
     return $p
 }
@@ -57,6 +87,7 @@ function Start-Service2([string]$name, [string]$exe, [string[]]$argList, [string
 if (Test-Path $PidFile) {
     Step 'Останавливаю предыдущий запуск'
     & (Join-Path $PSScriptRoot 'stop.ps1') -Quiet
+    Start-Sleep -Seconds 2   # дать процессам освободить порты
 }
 
 # ------------------------------------------------------------------ 1. Программы
@@ -147,7 +178,7 @@ Step 'Устанавливаю зависимости интерфейса (пе
 $front = Join-Path $Root 'frontend'
 if (-not (Test-Path (Join-Path $front 'node_modules\.bin\vite.cmd'))) {
     Push-Location $front
-    & npm.cmd ci --no-audit --no-fund
+    & npm.cmd ci --no-audit --no-fund --loglevel=error
     $code = $LASTEXITCODE
     Pop-Location
     if ($code -ne 0) { Fail 'npm ci завершился с ошибкой (см. сообщения выше).' }
@@ -156,11 +187,22 @@ $Npm = (Get-Command npm.cmd -ErrorAction SilentlyContinue).Source
 if (-not $Npm) { Fail 'Не найден npm (ставится вместе с Node.js).' }
 Write-Host '    frontend — готово'
 
-# ------------------------------------------------------------------ 4. Запуск
+# ------------------------------------------------------------------ 4. Порты
+Step 'Проверяю свободные порты'
+foreach ($need in @(@{ Name = 'симулятора'; Port = 8081 }, @{ Name = 'API'; Port = 8000 })) {
+    if (-not (Test-PortFree $need.Port)) {
+        Fail ("Порт $($need.Port) для $($need.Name) занят другой программой. Найти её: netstat -ano | findstr :$($need.Port) " +
+              '(последнее число — PID, его видно в диспетчере задач на вкладке «Подробности»).')
+    }
+}
+$WebPorts = @(5173) + (5180..5199) + @(3000, 4173, 8088)
+Write-Host '    8000 и 8081 свободны'
+
+# ------------------------------------------------------------------ 5. Запуск
 $env:DATABASE_URL = 'postgresql+psycopg://credit:credit@localhost:5432/credit'
 $env:INTEGRATIONS_BASE_URL = 'http://127.0.0.1:8081'
 $env:STORAGE_DIR = Join-Path $Root 'backend\data\uploads'
-$env:CORS_ORIGINS = 'http://localhost:5173'
+$env:CORS_ORIGINS = 'http://127.0.0.1:5173,http://localhost:5173'   # интерфейс ходит в API через прокси Vite, CORS не участвует
 $env:VITE_API_PROXY = 'http://127.0.0.1:8000'
 $env:WORKER_METRICS_HOST = '127.0.0.1'
 $env:PYTHONUTF8 = '1'
@@ -168,8 +210,8 @@ $env:PYTHONIOENCODING = 'utf-8'
 if (Test-Path $PidFile) { Remove-Item $PidFile -Force }
 
 Step 'Запускаю симулятор внешних систем'
-Start-Service2 'mocks' $MocksPy @('-m', 'uvicorn', 'simulator.main:app', '--host', '127.0.0.1', '--port', '8081', '--log-level', 'warning') (Join-Path $Root 'mocks') | Out-Null
-if (-not (Wait-Http 'http://127.0.0.1:8081/health' 60)) { Fail 'Симулятор не запустился — см. .run\mocks.err.log' }
+$p = Start-Service2 'mocks' $MocksPy @('-m', 'uvicorn', 'simulator.main:app', '--host', '127.0.0.1', '--port', '8081', '--log-level', 'warning') (Join-Path $Root 'mocks')
+if (-not (Wait-Http 'http://127.0.0.1:8081/health' 60 $p)) { Fail 'Симулятор не запустился.' 'mocks' }
 
 Step 'Применяю миграции и тестовые данные (первый раз — около минуты)'
 Push-Location (Join-Path $Root 'backend')
@@ -184,24 +226,39 @@ if ($code -ne 0) { Fail 'Не удалось создать тестовые д�
 
 Step 'Запускаю API и конвейер'
 $backend = Join-Path $Root 'backend'
-Start-Service2 'api' $BackendPy @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', '8000') $backend | Out-Null
+$apiProc = Start-Service2 'api' $BackendPy @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', '8000') $backend
 foreach ($i in 1, 2) {
     $env:WORKER_ID = "worker-$i"
     $env:WORKER_METRICS_PORT = "$((9100 + $i))"
     Start-Service2 "worker$i" $BackendPy @('-m', 'app.worker') $backend | Out-Null
 }
-if (-not (Wait-Http 'http://127.0.0.1:8000/api/health/ready' 90)) { Fail 'API не запустился — см. .run\api.err.log' }
+if (-not (Wait-Http 'http://127.0.0.1:8000/api/health/ready' 90 $apiProc)) { Fail 'API не запустился.' 'api' }
 
 Step 'Запускаю интерфейс'
-Start-Service2 'web' $Npm @('run', 'dev', '--', '--port', '5173', '--strictPort') $front | Out-Null
-if (-not (Wait-Http 'http://localhost:5173/' 120)) { Fail 'Интерфейс не запустился — см. .run\web.log и .run\web.err.log (возможно, порт 5173 занят)' }
+$WebUrl = $null
+$tried = @()
+foreach ($attempt in 1..3) {
+    $WebPort = Find-FreePort ($WebPorts | Where-Object { $tried -notcontains $_ })
+    if (-not $WebPort) { break }
+    $tried += $WebPort
+    if ($WebPort -ne 5173) { Write-Host "    Порт 5173 занят или зарезервирован Windows — беру порт $WebPort" -ForegroundColor Yellow }
+    $webProc = Start-Service2 'web' $Npm @('run', 'dev', '--', '--host', '127.0.0.1', '--port', "$WebPort", '--strictPort') $front
+    if (Wait-Http "http://127.0.0.1:$WebPort/" 180 $webProc) { $WebUrl = "http://127.0.0.1:$WebPort"; break }
+    if (-not $webProc.HasExited) { break }   # процесс жив, но не отвечает — другой порт не поможет
+    $out = (Get-Content (Join-Path $RunDir 'web.log'), (Join-Path $RunDir 'web.err.log') -Raw -ErrorAction SilentlyContinue) -join ''
+    if ($out -notmatch 'already in use|EADDRINUSE|EACCES') { break }   # упал не из-за порта
+}
+if (-not $WebUrl) {
+    if ($webProc -and -not $webProc.HasExited) { & taskkill.exe /PID $webProc.Id /T /F 2>$null | Out-Null }
+    Fail 'Интерфейс не запустился, причина — в строках журнала выше.' 'web'
+}
 
 Write-Host ''
 Write-Host 'Стенд запущен' -ForegroundColor Green
-Write-Host '  Интерфейс:          http://localhost:5173   (учётки на странице входа, пароль Demo-2026)'
-Write-Host '  Swagger UI:         http://localhost:5173/api/docs'
+Write-Host "  Интерфейс:          $WebUrl   (учётки на странице входа, пароль Demo-2026)"
+Write-Host "  Swagger UI:         $WebUrl/api/docs"
 Write-Host '  Симулятор и сбои:   http://127.0.0.1:8081/docs'
 Write-Host '  Журналы:            папка .run'
 Write-Host '  Остановить:         scripts\windows\stop.cmd'
-Write-Host '  Сквозные сценарии:  backend\.venv\Scripts\python tests\e2e\run_scenarios.py --base http://localhost:5173 --mocks http://127.0.0.1:8081'
-Start-Process 'http://localhost:5173'
+Write-Host "  Сквозные сценарии:  backend\.venv\Scripts\python tests\e2e\run_scenarios.py --base $WebUrl --mocks http://127.0.0.1:8081"
+Start-Process $WebUrl
