@@ -1,41 +1,67 @@
-import { Alert, Badge, Box, Button, Card, Grid, Group, List, Modal, SimpleGrid, Stack, Text, Textarea, ThemeIcon, Title } from '@mantine/core';
-import { IconAlertTriangle, IconArrowRight, IconBolt, IconCheck, IconCircleCheck, IconCircleX, IconFileText, IconLoader2, IconSignature, IconX } from '@tabler/icons-react';
+import { Alert, Box, Button, Collapse, Grid, Group, List, Modal, SimpleGrid, Stack, Text, Textarea, Title } from '@mantine/core';
+import { IconAlertTriangle, IconArrowRight, IconCheck, IconFileText, IconSignature } from '@tabler/icons-react';
 import { useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { api, errorText } from '../../api/client';
 import type { Application } from '../../api/types';
 import { DocDropzone, DocumentsList } from '../../components/Documents';
-import { RouteMap } from '../../components/RouteMap';
+import { RouteMap, currentStage } from '../../components/RouteMap';
 import { Schedule } from '../../components/Schedule';
 import { SignModal } from '../../components/SignModal';
 import { Timeline } from '../../components/Timeline';
-import { ErrorAlert, Loading, PageHeader, Section, StatusBadge, WaitingChip } from '../../components/ui';
-import { date, dateTime, money, months, pct } from '../../lib/format';
+import { BackLink, ErrorAlert, Loading, Money, Plate, Section, Status, Tag } from '../../components/ui';
+import { date, dateTime, money, months, pct, slaLeft } from '../../lib/format';
+import { TONE } from '../../lib/labels';
+import { CheckDraw, Spinner } from '../../lib/motion';
 import { useApplication, useSetApplication } from './hooks';
 
 const LIVE = new Set(['submitted', 'data_check', 'enrichment', 'scoring', 'disbursement']);
+
+const CHECKS = [
+  { title: 'Проверяем анкету и документы', hint: 'полнота и корректность данных' },
+  { title: 'Запрашиваем ЕГРЮЛ, ФНС и бюро кредитных историй', hint: 'обычно 10–20 секунд' },
+  { title: 'Считаем оценку и посильный платёж', hint: 'скоринговая модель и кредитная политика банка' },
+  { title: 'Готовим решение', hint: 'одобрение, другие условия или передача специалисту' },
+];
+const CHECK_AT: Record<string, number> = { submitted: 0, data_check: 0, enrichment: 1, scoring: 2 };
+
+/** Живая проверка: пока работает конвейер, пункты по очереди получают галочку. */
+function LiveChecks({ status }: { status: string }) {
+  const at = CHECK_AT[status] ?? 0;
+  return (
+    <Plate tone="white">
+      <Text fw={600}>Что происходит сейчас</Text>
+      <Text size="sm" c="dimmed" mt={2}>
+        Обычно это меньше минуты — страницу можно не обновлять.
+      </Text>
+      <div className="live-steps" style={{ marginTop: 12 }}>
+        {CHECKS.map((c, i) => {
+          const state = i < at ? 'done' : i === at ? 'current' : 'upcoming';
+          return (
+            <div key={c.title} className={`live-step ${state}`}>
+              <span className="ic">{state === 'done' ? <CheckDraw size={22} /> : state === 'current' ? <Spinner /> : null}</span>
+              <div>
+                <div className="t">{c.title}</div>
+                <div className="h">{c.hint}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Plate>
+  );
+}
 
 function TasksBlock({ app, onChange }: { app: Application; onChange: (a: Application) => void }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const open = app.tasks.filter((t) => t.status === 'open');
-  const answer = async (taskId: string) => {
-    setBusy(taskId);
+  const run = async (key: string, fn: () => Promise<Application>) => {
+    setBusy(key);
     setError(null);
     try {
-      onChange(await api.post<Application>(`/api/v1/applications/${app.id}/tasks/${taskId}/answer`, { text: answers[taskId] }));
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(null);
-    }
-  };
-  const resume = async () => {
-    setBusy('resume');
-    setError(null);
-    try {
-      onChange(await api.post<Application>(`/api/v1/applications/${app.id}/resume`));
+      onChange(await fn());
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -43,39 +69,36 @@ function TasksBlock({ app, onChange }: { app: Application; onChange: (a: Applica
     }
   };
   return (
-    <Card style={{ borderColor: 'var(--mantine-color-amber-4)', borderWidth: 2 }}>
-      <Group gap={8} mb="xs">
-        <ThemeIcon color="amber" variant="filled" radius="xl" size={28}>
-          <IconBolt size={16} />
-        </ThemeIcon>
-        <Title order={3}>Нужны уточнения</Title>
-      </Group>
-      <Text size="sm" c="dimmed" mb="md">
-        Выполните задачи — после этого нажмите «Вернуть заявку в работу», и проверка продолжится автоматически.
+    <Plate tone="warn" size="lg">
+      <Title order={2} fz={24}>
+        Нужны уточнения
+      </Title>
+      <Text size="sm" mt={6} c="var(--ink-2)">
+        Выполните задачи и верните заявку в работу — проверка продолжится автоматически.
       </Text>
-      <Stack gap="sm">
+      <Stack gap={10} mt="lg">
         {app.tasks
           .filter((t) => t.status !== 'cancelled')
           .map((t) => (
-            <Card key={t.id} padding="md" withBorder bg={t.status === 'open' ? undefined : 'var(--mantine-color-lime-0)'}>
-              <Group justify="space-between" wrap="nowrap" align="flex-start">
-                <Box>
-                  <Group gap={6}>
-                    <Text fw={600}>{t.title}</Text>
-                    <Badge size="xs" color={t.from_bank ? 'violet' : 'route'}>
-                      {t.from_bank ? 'запрос специалиста' : 'автоматическая проверка'}
-                    </Badge>
-                  </Group>
+            <Box key={t.id} bg="#fff" p={16} style={{ borderRadius: 16 }}>
+              <Group justify="space-between" wrap="nowrap" align="flex-start" gap="sm">
+                <Box style={{ minWidth: 0 }}>
+                  <Text fw={600} size="sm">
+                    {t.title}
+                  </Text>
                   {t.description && (
                     <Text size="sm" c="dimmed">
                       {t.description}
                     </Text>
                   )}
+                  <Text size="xs" c="dimmed" mt={4}>
+                    {t.from_bank ? 'Запрос специалиста банка' : 'Автоматическая проверка'}
+                  </Text>
                 </Box>
                 {t.status !== 'open' && (
-                  <Badge color="lime" leftSection={<IconCheck size={11} />}>
-                    выполнено
-                  </Badge>
+                  <Tag tone="ok" icon={<IconCheck size={12} />}>
+                    Выполнено
+                  </Tag>
                 )}
               </Group>
               {t.status === 'open' && t.kind === 'document' && (
@@ -86,7 +109,7 @@ function TasksBlock({ app, onChange }: { app: Application; onChange: (a: Applica
               {t.status === 'open' && t.kind === 'question' && (
                 <Group mt="sm" align="flex-end" wrap="nowrap">
                   <Textarea style={{ flex: 1 }} autosize minRows={1} placeholder="Ваш ответ" value={answers[t.id] ?? ''} onChange={(e) => setAnswers((a) => ({ ...a, [t.id]: e.currentTarget.value }))} />
-                  <Button onClick={() => answer(t.id)} loading={busy === t.id} disabled={!answers[t.id]?.trim()}>
+                  <Button onClick={() => run(t.id, () => api.post<Application>(`/api/v1/applications/${app.id}/tasks/${t.id}/answer`, { text: answers[t.id] }))} loading={busy === t.id} disabled={!answers[t.id]?.trim()}>
                     Ответить
                   </Button>
                 </Group>
@@ -96,20 +119,20 @@ function TasksBlock({ app, onChange }: { app: Application; onChange: (a: Applica
                   Ваш ответ: {t.answer_text}
                 </Text>
               )}
-            </Card>
+            </Box>
           ))}
       </Stack>
       {error && (
-        <Alert color="signal" variant="light" mt="sm">
+        <Alert color="bad" mt="sm">
           {error}
         </Alert>
       )}
-      <Group justify="flex-end" mt="md">
-        <Button color="amber" rightSection={<IconArrowRight size={16} />} disabled={open.length > 0} loading={busy === 'resume'} onClick={resume}>
+      <Group justify="flex-end" mt="lg">
+        <Button color="brand" size="md" rightSection={<IconArrowRight size={17} />} disabled={open.length > 0} loading={busy === 'resume'} onClick={() => run('resume', () => api.post<Application>(`/api/v1/applications/${app.id}/resume`))}>
           {open.length ? `Осталось задач: ${open.length}` : 'Вернуть заявку в работу'}
         </Button>
       </Group>
-    </Card>
+    </Plate>
   );
 }
 
@@ -120,7 +143,9 @@ function OfferBlock({ app, onChange }: { app: Application; onChange: (a: Applica
   const [contract, setContract] = useState<string | null>(null);
   const [sign, setSign] = useState(false);
   const [declineOpen, setDeclineOpen] = useState(false);
+  const [schedule, setSchedule] = useState(false);
   const canSign = app.company.membership?.can_sign;
+  const isLE = app.company.legal_form === 'LE';
   const act = async (name: string, fn: () => Promise<Application>) => {
     setBusy(name);
     setError(null);
@@ -142,126 +167,160 @@ function OfferBlock({ app, onChange }: { app: Application; onChange: (a: Applica
       setBusy(null);
     }
   };
-  const isLE = app.company.legal_form === 'LE';
+  const active = app.status === 'offer_issued';
+  const statusText = o.status === 'accepted' ? 'Предложение принято' : o.status === 'active' ? `Действует до ${dateTime(o.expires_at)}` : o.status === 'declined' ? 'Вы отказались от предложения' : o.status === 'expired' ? 'Срок предложения истёк' : o.status;
+
   return (
-    <Card style={app.status === 'offer_issued' ? { borderColor: 'var(--mantine-color-lime-5)', borderWidth: 2 } : undefined}>
-      <Group justify="space-between" align="flex-start">
-        <Box>
-          <Group gap={8}>
-            <ThemeIcon color="lime" radius="xl" size={28}>
-              <IconCircleCheck size={18} />
-            </ThemeIcon>
-            <Title order={3}>{o.is_counter ? 'Банк готов выдать кредит на других условиях' : 'Кредитное предложение'}</Title>
-          </Group>
-          {app.status === 'offer_issued' && (
-            <Text size="sm" c="dimmed" mt={4}>
-              Действует до {dateTime(o.expires_at)}
-            </Text>
-          )}
-        </Box>
-        <Badge color={o.status === 'accepted' ? 'lime' : o.status === 'active' ? 'route' : 'gray'} size="lg">
-          {o.status === 'accepted' ? 'принято' : o.status === 'active' ? 'ждёт решения' : o.status === 'declined' ? 'отклонено' : o.status === 'expired' ? 'истекло' : o.status}
-        </Badge>
-      </Group>
-      <SimpleGrid cols={{ base: 2, sm: 4 }} mt="lg">
-        {[
-          ['Сумма', money(o.amount)],
-          ['Срок', months(o.term_months)],
-          ['Ставка', pct(o.rate, 2)],
-          [o.payment_kind === 'annuity' ? 'Платёж в месяц' : 'Проценты в месяц', money(o.monthly_payment)],
-        ].map(([k, v]) => (
-          <Box key={k}>
-            <Text size="xs" c="dimmed">
-              {k}
-            </Text>
-            <Text fz={22} fw={700} className="num" ff="Unbounded, Onest, sans-serif">
-              {v}
-            </Text>
-          </Box>
-        ))}
-      </SimpleGrid>
-      <Text size="sm" c="dimmed" mt="xs" className="num">
-        Всего выплат {money(o.total_payment)} · переплата {money(o.overpayment)} · эффективная ставка {pct(o.effective_rate, 2)} (без комиссий)
+    <Plate tone="white" size="lg" className="rise">
+      <Text size="sm" c="dimmed">
+        Предложение банка · {statusText}
       </Text>
-      {o.changes.length > 0 && (
-        <Alert color="amber" variant="light" mt="md" icon={<IconAlertTriangle size={18} />} title="Что изменилось относительно запроса">
-          <List size="sm" spacing={4}>
-            {o.changes.map((c) => (
-              <List.Item key={c}>{c}</List.Item>
-            ))}
-          </List>
-          <Text size="xs" mt={6}>
-            Платёж должен быть посильным для денежного потока бизнеса — так банк защищает и вас, и себя. Вы можете отказаться без последствий.
+      <Group gap={12} mt={6} wrap="nowrap" align="flex-start">
+        {active && <CheckDraw size={28} delay={250} style={{ marginTop: 2 }} />}
+        <Title order={2} fz={{ base: 22, sm: 26 }}>
+          {o.is_counter ? 'Банк готов выдать кредит на других условиях' : 'Банк одобрил кредит'}
+        </Title>
+      </Group>
+      <Group align="baseline" gap={10} mt={18} wrap="wrap">
+        <Money value={o.amount} size="clamp(36px, 6vw, 52px)" countUp={active} />
+        <Text fz={18} c="var(--ink-2)">
+          на {months(o.term_months)}
+        </Text>
+      </Group>
+      <SimpleGrid cols={{ base: 2, sm: 3 }} mt={22} spacing="md">
+        <Box>
+          <Text size="sm" c="dimmed">
+            {o.payment_kind === 'annuity' ? 'Платёж в месяц' : 'Проценты в месяц'}
           </Text>
-        </Alert>
+          <Money value={o.monthly_payment} size={22} />
+        </Box>
+        <Box>
+          <Text size="sm" c="dimmed">
+            Ставка
+          </Text>
+          <Text fz={22} fw={700} className="display num">
+            {pct(o.rate, 2)}
+          </Text>
+        </Box>
+        <Box>
+          <Text size="sm" c="dimmed">
+            Переплата
+          </Text>
+          <Money value={o.overpayment} size={22} />
+        </Box>
+      </SimpleGrid>
+      <Text size="xs" c="dimmed" mt={10} className="num">
+        Всего выплат {money(o.total_payment)} · эффективная ставка {pct(o.effective_rate, 2)} · без комиссий
+      </Text>
+
+      {o.changes.length > 0 && (
+        <Plate tone="warn" size="sm" style={{ marginTop: 20 }}>
+          <Group gap={8} wrap="nowrap" align="flex-start">
+            <IconAlertTriangle size={18} color="var(--warn)" style={{ flex: 'none', marginTop: 1 }} />
+            <Box>
+              <Text size="sm" fw={600}>
+                Что изменилось относительно запроса
+              </Text>
+              <List size="sm" spacing={3} mt={4}>
+                {o.changes.map((c) => (
+                  <List.Item key={c}>{c}</List.Item>
+                ))}
+              </List>
+              <Text size="xs" mt={8} c="var(--ink-2)">
+                Платёж должен быть посильным для денежного потока бизнеса — так банк защищает и вас, и себя. Отказаться можно без последствий.
+              </Text>
+            </Box>
+          </Group>
+        </Plate>
       )}
+
       {o.conditions.length > 0 && (
-        <Box mt="md">
-          <Text size="sm" fw={600} mb={4}>
+        <Box mt={20}>
+          <Text size="sm" fw={600} mb={6}>
             Условия
           </Text>
-          <List size="sm" spacing={2}>
+          <List size="sm" spacing={3}>
             {o.conditions.map((c) => (
               <List.Item key={c}>{c}</List.Item>
             ))}
           </List>
         </Box>
       )}
-      <Box mt="md">
-        <Text size="sm" fw={600} mb={4}>
-          График платежей
-        </Text>
-        <Schedule rows={o.schedule} />
+
+      <Box mt={20}>
+        <button type="button" className="link-btn" style={{ fontSize: 14 }} onClick={() => setSchedule((s) => !s)}>
+          {schedule ? 'Скрыть график платежей' : 'График платежей'}
+        </button>
+        <Collapse in={schedule}>
+          <Box mt="sm">
+            <Schedule rows={o.schedule} />
+          </Box>
+        </Collapse>
       </Box>
+
       {error && (
-        <Alert color="signal" variant="light" mt="md">
+        <Alert color="bad" mt="md">
           {error}
         </Alert>
       )}
       {!canSign && ['offer_issued', 'offer_accepted'].includes(app.status) && (
-        <Alert color="amber" variant="light" mt="md">
+        <Text size="sm" c="var(--warn-ink)" mt="md">
           Принять предложение и подписать договор может руководитель или собственник с правом подписи.
-        </Alert>
+        </Text>
       )}
-      <Group mt="lg" justify="flex-end">
-        {app.actions.includes('decline_offer') && (
-          <Button variant="default" color="gray" leftSection={<IconX size={16} />} onClick={() => setDeclineOpen(true)}>
-            Отказаться
-          </Button>
-        )}
+      <Group mt={28} gap="sm">
         {app.actions.includes('accept_offer') && (
-          <Button color="lime" c="ink.9" leftSection={<IconCheck size={16} />} loading={busy === 'accept'} onClick={() => act('accept', () => api.post<Application>(`/api/v1/applications/${app.id}/offer/accept`, undefined, { idempotent: true }))}>
+          <Button color="brand" size="lg" leftSection={<IconCheck size={18} />} loading={busy === 'accept'} onClick={() => act('accept', () => api.post<Application>(`/api/v1/applications/${app.id}/offer/accept`, undefined, { idempotent: true }))}>
             Принять предложение
           </Button>
         )}
-        {['offer_accepted', 'disbursement', 'issued'].includes(app.status) && (
-          <Button variant="light" leftSection={<IconFileText size={16} />} loading={busy === 'contract'} onClick={showContract}>
-            {app.status === 'offer_accepted' ? 'Посмотреть договор' : 'Договор'}
-          </Button>
-        )}
         {app.actions.includes('sign_contract') && (
-          <Button leftSection={<IconSignature size={16} />} onClick={() => setSign(true)}>
+          <Button color="brand" size="lg" leftSection={<IconSignature size={18} />} onClick={() => setSign(true)}>
             Подписать договор
           </Button>
         )}
+        {['offer_accepted', 'disbursement', 'issued'].includes(app.status) && (
+          <Button variant="default" size="lg" leftSection={<IconFileText size={18} />} loading={busy === 'contract'} onClick={showContract}>
+            {app.status === 'offer_accepted' ? 'Посмотреть договор' : 'Договор'}
+          </Button>
+        )}
+        {app.actions.includes('decline_offer') && (
+          <Button variant="default" size="lg" onClick={() => setDeclineOpen(true)}>
+            Отказаться
+          </Button>
+        )}
       </Group>
-      <Modal opened={!!contract} onClose={() => setContract(null)} size="xl" title={<Text fw={700}>Кредитный договор</Text>}>
-        {contract && <iframe title="Договор" srcDoc={contract} sandbox="" style={{ width: '100%', height: '70vh', border: '1px solid var(--line)', borderRadius: 8, background: '#fff' }} />}
+      {active && (
+        <Text size="xs" c="dimmed" mt={10}>
+          После принятия откроется договор — его можно прочитать и подписать здесь же, деньги придут на расчётный счёт.
+        </Text>
+      )}
+
+      <Modal opened={!!contract} onClose={() => setContract(null)} size="xl" title="Кредитный договор">
+        {contract && <iframe title="Договор" srcDoc={contract} sandbox="" style={{ width: '100%', height: '68vh', border: '1px solid var(--line)', borderRadius: 12, background: '#fff' }} />}
         {app.actions.includes('sign_contract') && (
           <Group justify="flex-end" mt="md">
-            <Button leftSection={<IconSignature size={16} />} onClick={() => { setContract(null); setSign(true); }}>
+            <Button
+              color="brand"
+              size="md"
+              leftSection={<IconSignature size={18} />}
+              onClick={() => {
+                setContract(null);
+                setSign(true);
+              }}
+            >
               Подписать договор
             </Button>
           </Group>
         )}
       </Modal>
-      <Modal opened={declineOpen} onClose={() => setDeclineOpen(false)} title={<Text fw={700}>Отказаться от предложения?</Text>} centered>
-        <Text size="sm">Заявка будет закрыта. Это не влияет на кредитную историю — подать новую заявку можно в любой момент.</Text>
-        <Group justify="flex-end" mt="lg">
+      <Modal opened={declineOpen} onClose={() => setDeclineOpen(false)} title="Отказаться от предложения?">
+        <Text size="sm">Заявка будет закрыта. Это не влияет на кредитную историю — новую заявку можно подать в любой момент.</Text>
+        <Group justify="flex-end" mt="xl" gap="sm">
           <Button variant="default" onClick={() => setDeclineOpen(false)}>
             Оставить
           </Button>
-          <Button color="signal" loading={busy === 'decline'} onClick={() => act('decline', () => api.post<Application>(`/api/v1/applications/${app.id}/offer/decline`, { comment: 'Клиент отказался в кабинете' })).then(() => setDeclineOpen(false))}>
+          <Button color="bad" loading={busy === 'decline'} onClick={() => act('decline', () => api.post<Application>(`/api/v1/applications/${app.id}/offer/decline`, { comment: 'Клиент отказался в кабинете' })).then(() => setDeclineOpen(false))}>
             Отказаться
           </Button>
         </Group>
@@ -271,25 +330,24 @@ function OfferBlock({ app, onChange }: { app: Application; onChange: (a: Applica
         onClose={() => setSign(false)}
         title="Подписание кредитного договора"
         documents={[`Кредитный договор на ${money(o.amount)}`, ...(isLE ? ['Договор поручительства собственника'] : [])]}
-        onSign={async (password) => onChange(await api.post<Application>(`/api/v1/applications/${app.id}/contract/sign`, { password }, { idempotent: true }))}
+        onSign={(password) => api.post<Application>(`/api/v1/applications/${app.id}/contract/sign`, { password }, { idempotent: true })}
+        onDone={(a) => onChange(a as Application)}
+        doneText={{ title: 'Договор подписан', text: 'Перечисляем деньги на расчётный счёт — это займёт несколько секунд.' }}
         confirmLabel="Подписать договор"
       />
-    </Card>
+    </Plate>
   );
 }
 
 function DeclineBlock({ app }: { app: Application }) {
   const e = app.explanation!;
   return (
-    <Card style={{ borderColor: 'var(--mantine-color-signal-3)' }}>
-      <Group gap={8}>
-        <ThemeIcon color="signal" radius="xl" size={28} variant="light">
-          <IconCircleX size={18} />
-        </ThemeIcon>
-        <Title order={3}>{e.headline}</Title>
-      </Group>
-      <Text size="sm" fw={600} mt="md" mb={4}>
-        Причины решения
+    <Plate size="lg">
+      <Title order={2} fz={{ base: 22, sm: 26 }}>
+        {e.headline}
+      </Title>
+      <Text size="sm" fw={600} mt="lg" mb={6}>
+        Почему
       </Text>
       <List size="sm" spacing={6}>
         {e.reasons.map((r) => (
@@ -297,11 +355,9 @@ function DeclineBlock({ app }: { app: Application }) {
         ))}
       </List>
       {e.plan.length > 0 && (
-        <Card mt="md" padding="md" bg="var(--mantine-color-route-0)" withBorder={false}>
-          <Text fw={700} mb={6}>
-            Что сделать, чтобы следующая заявка была одобрена
-          </Text>
-          <List type="ordered" size="sm" spacing={6}>
+        <Box bg="#fff" p={{ base: 16, sm: 22 }} mt="lg" style={{ borderRadius: 18 }}>
+          <Text fw={600}>Что сделать, чтобы следующая заявка была одобрена</Text>
+          <List type="ordered" size="sm" spacing={6} mt={8}>
             {e.plan.map((p) => (
               <List.Item key={p}>{p}</List.Item>
             ))}
@@ -311,38 +367,42 @@ function DeclineBlock({ app }: { app: Application }) {
               Повторная заявка: {/^\d{4}-/.test(e.can_reapply_after) ? `рекомендуем не раньше ${date(e.can_reapply_after)}` : e.can_reapply_after}
             </Text>
           )}
-        </Card>
+        </Box>
       )}
       {(e.negatives.length > 0 || e.positives.length > 0) && (
-        <SimpleGrid cols={{ base: 1, sm: 2 }} mt="md">
+        <SimpleGrid cols={{ base: 1, sm: 2 }} mt="lg" spacing="lg">
           <Box>
-            <Text size="sm" fw={600} mb={4}>
-              Сильнее всего снизили оценку
+            <Text size="sm" fw={600} mb={6}>
+              Сильнее всего снизило оценку
             </Text>
-            {e.negatives.map((n) => (
-              <Text key={n.title} size="sm">
-                • {n.title}: <b>{n.value}</b>
-              </Text>
-            ))}
+            <Stack gap={4}>
+              {e.negatives.map((n) => (
+                <Text key={n.title} size="sm">
+                  {n.title}: <b>{n.value}</b>
+                </Text>
+              ))}
+            </Stack>
           </Box>
           <Box>
-            <Text size="sm" fw={600} mb={4}>
+            <Text size="sm" fw={600} mb={6}>
               Ваши сильные стороны
             </Text>
-            {e.positives.map((n) => (
-              <Text key={n.title} size="sm">
-                • {n.title}: <b>{n.value}</b>
-              </Text>
-            ))}
+            <Stack gap={4}>
+              {e.positives.map((n) => (
+                <Text key={n.title} size="sm">
+                  {n.title}: <b>{n.value}</b>
+                </Text>
+              ))}
+            </Stack>
           </Box>
         </SimpleGrid>
       )}
-      <Group mt="md">
-        <Button variant="light" component={Link} to="/products">
+      <Group mt="xl">
+        <Button variant="default" component={Link} to="/products">
           Подобрать другой продукт
         </Button>
       </Group>
-    </Card>
+    </Plate>
   );
 }
 
@@ -358,6 +418,8 @@ export function ApplicationPage() {
   if (!app) return null;
   if (['draft', 'pending_signature'].includes(app.status) && app.actions.includes('edit')) return <Navigate to={`/applications/${app.id}/edit`} replace />;
   const live = LIVE.has(app.status);
+  const sla = app.waiting === 'bank' ? slaLeft(app.sla_due_at) : null;
+  const stage = currentStage(app.stages);
   const cancel = async () => {
     setBusy(true);
     try {
@@ -367,67 +429,98 @@ export function ApplicationPage() {
       setBusy(false);
     }
   };
+  const tone = TONE[app.status_tone] ?? '';
+
   return (
-    <Stack gap="lg">
-      <PageHeader
-        eyebrow={`Заявка ${app.number} · ${app.company.short_name}`}
-        title={app.product.name}
-        subtitle={`${money(app.amount)} на ${months(app.term_months)} · ${app.purpose_title}`}
-        right={<StatusBadge label={app.status_label} tone={app.status_tone} size="lg" pulse={live} />}
-      />
-      <Card>
-        <Group justify="space-between" mb="md" wrap="wrap">
-          <WaitingChip waiting={app.waiting} due={app.sla_due_at} />
-          {live && (
-            <Group gap={6} c="route">
-              <IconLoader2 size={16} className="pulse" />
-              <Text size="sm" c="route">
-                Статус обновляется автоматически
+    <Box>
+      <BackLink to="/applications">Заявки</BackLink>
+      <Group justify="space-between" align="flex-end" mt={10} mb={28} wrap="wrap" gap="md">
+        <Box style={{ minWidth: 0 }}>
+          <Text size="sm" c="dimmed">
+            Заявка {app.number}
+            {app.submitted_at ? ` · подана ${dateTime(app.submitted_at)}` : ''}
+          </Text>
+          <Title order={1} fz={{ base: 28, sm: 36 }} mt={4}>
+            {app.product.name}
+          </Title>
+          <Text c="var(--ink-2)" mt={6}>
+            {money(app.amount)} на {months(app.term_months)} · {app.purpose_title}
+          </Text>
+        </Box>
+      </Group>
+
+      <Plate size="lg">
+        <Group justify="space-between" wrap="wrap" gap="sm" mb={18}>
+          <Box>
+            <Status tone={tone} pulse={live}>
+              <Text span fw={700} fz={20} className="display">
+                {app.status_label}
               </Text>
-            </Group>
-          )}
+            </Status>
+          </Box>
+          {live ? (
+            <Text size="sm" c="dimmed">
+              Статус обновляется сам
+            </Text>
+          ) : sla ? (
+            <Text size="sm" c={sla.overdue ? 'bad' : 'dimmed'}>
+              Норматив рассмотрения: {sla.text}
+            </Text>
+          ) : null}
         </Group>
         <RouteMap stages={app.stages} waiting={app.waiting} />
-        <Text mt="md" size="sm">
+        {stage && (
+          <Text size="xs" c="dimmed" mt={8} hiddenFrom="sm">
+            Этап {stage.index + 1} из {app.stages.length} · {stage.title}
+          </Text>
+        )}
+        <Text mt={18} c="var(--ink-2)" maw={760}>
           {app.status_hint}
         </Text>
         {app.next_action && (
-          <Text fw={700} mt={6} c={app.waiting === 'client' ? 'amber.8' : undefined}>
-            → {app.next_action}
+          <Text fw={600} mt={8} c={app.waiting === 'client' ? 'var(--warn-ink)' : undefined}>
+            {app.waiting === 'client' ? 'Ваш шаг: ' : 'Дальше: '}
+            {app.next_action}
           </Text>
         )}
-      </Card>
-      <Grid gutter="lg">
+      </Plate>
+
+      <Grid gutter={{ base: 32, md: 48 }} mt={32}>
         <Grid.Col span={{ base: 12, md: 8 }}>
-          <Stack gap="lg">
+          <Stack gap={32}>
             {app.status === 'info_requested' && <TasksBlock app={app} onChange={setApp} />}
+            {app.loan && (
+              <Plate tone="ok" size="lg" className="rise">
+                <Text size="sm" c="var(--ink-2)">
+                  Кредит выдан {date(app.loan.issued_at)}
+                </Text>
+                <Group gap={12} mt={4} wrap="nowrap">
+                  <CheckDraw size={28} delay={200} />
+                  <Title order={2} fz={{ base: 22, sm: 26 }}>
+                    Деньги на счёте
+                  </Title>
+                </Group>
+                <Box mt={10}>
+                  <Money value={app.loan.amount} size={40} countUp />
+                </Box>
+                <Text size="sm" mt={8}>
+                  Зачислены на расчётный счёт {app.loan.settlement_account}. Договор {app.loan.contract_number}, ссудный счёт {app.loan.loan_account}.
+                </Text>
+                <Button mt="lg" variant="white" component={Link} to="/loans" rightSection={<IconArrowRight size={16} />}>
+                  График платежей
+                </Button>
+              </Plate>
+            )}
             {app.offer && <OfferBlock app={app} onChange={setApp} />}
             {app.status === 'declined' && app.explanation && <DeclineBlock app={app} />}
-            {app.loan && (
-              <Card style={{ borderColor: 'var(--mantine-color-teal-4)', borderWidth: 2 }}>
-                <Group gap={8}>
-                  <ThemeIcon color="teal" radius="xl">
-                    <IconCircleCheck size={18} />
-                  </ThemeIcon>
-                  <Title order={3}>Деньги на счёте</Title>
-                </Group>
-                <Text size="sm" mt="sm">
-                  {money(app.loan.amount)} зачислены на расчётный счёт {app.loan.settlement_account}. Договор {app.loan.contract_number}, ссудный счёт {app.loan.loan_account}.
-                </Text>
-                <Button mt="md" variant="light" color="teal" component={Link} to="/loans">
-                  График платежей в разделе «Кредиты»
-                </Button>
-              </Card>
-            )}
-            {(live || app.waiting === 'bank') && !app.offer && (
-              <Card>
+            {live && app.status !== 'disbursement' && !app.offer && <LiveChecks status={app.status} />}
+            {app.waiting === 'bank' && !app.offer && (
+              <Box>
                 <Text fw={600}>Что происходит сейчас</Text>
-                <Text size="sm" c="dimmed" mt={4}>
-                  {app.waiting === 'bank'
-                    ? 'Заявку рассматривает специалист банка. Если понадобятся документы или пояснения, задача появится здесь и в уведомлениях.'
-                    : 'Система проверяет анкету, запрашивает сведения из ЕГРЮЛ/ЕГРИП, ФНС и бюро кредитных историй и рассчитывает оценку. Обычно это занимает меньше минуты.'}
+                <Text size="sm" c="var(--ink-2)" mt={4} maw={640}>
+                  Заявку рассматривает специалист банка. Если понадобятся документы или пояснения, задача появится здесь и в уведомлениях.
                 </Text>
-              </Card>
+              </Box>
             )}
             <Section title="Документы">
               <DocumentsList appId={app.id} docs={app.documents} />
@@ -435,16 +528,16 @@ export function ApplicationPage() {
           </Stack>
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 4 }}>
-          <Stack gap="lg">
-            <Section title="История заявки">
+          <Stack gap={32}>
+            <Section title="История">
               <Timeline events={app.events} limit={14} />
             </Section>
             {app.signatures.length > 0 && (
-              <Section title="Подписанные документы">
-                <Stack gap={6}>
+              <Section title="Подписано">
+                <div className="rows">
                   {app.signatures.map((s) => (
-                    <Box key={s.document_hash + s.document_kind}>
-                      <Text size="sm" fw={600}>
+                    <Box key={s.document_hash + s.document_kind} py={10}>
+                      <Text size="sm" fw={500}>
                         {s.document_title}
                       </Text>
                       <Text size="xs" c="dimmed">
@@ -455,28 +548,30 @@ export function ApplicationPage() {
                       </Text>
                     </Box>
                   ))}
-                </Stack>
+                </div>
               </Section>
             )}
             {app.actions.includes('cancel') && (
-              <Button variant="subtle" color="gray" onClick={() => setCancelOpen(true)}>
-                Отозвать заявку
-              </Button>
+              <Box>
+                <button type="button" className="link-btn" style={{ fontSize: 14, color: 'var(--muted)' }} onClick={() => setCancelOpen(true)}>
+                  Отозвать заявку
+                </button>
+              </Box>
             )}
           </Stack>
         </Grid.Col>
       </Grid>
-      <Modal opened={cancelOpen} onClose={() => setCancelOpen(false)} title={<Text fw={700}>Отозвать заявку?</Text>} centered>
+      <Modal opened={cancelOpen} onClose={() => setCancelOpen(false)} title="Отозвать заявку?">
         <Text size="sm">Рассмотрение будет остановлено. Данные компании сохранятся и подставятся в новую заявку.</Text>
-        <Group justify="flex-end" mt="lg">
+        <Group justify="flex-end" mt="xl" gap="sm">
           <Button variant="default" onClick={() => setCancelOpen(false)}>
             Нет
           </Button>
-          <Button color="signal" onClick={cancel} loading={busy}>
+          <Button color="bad" onClick={cancel} loading={busy}>
             Отозвать
           </Button>
         </Group>
       </Modal>
-    </Stack>
+    </Box>
   );
 }

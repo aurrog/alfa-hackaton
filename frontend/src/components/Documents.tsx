@@ -1,8 +1,9 @@
-import { ActionIcon, Alert, Badge, Box, Group, List, Progress, SimpleGrid, Stack, Text, ThemeIcon, Tooltip } from '@mantine/core';
+import { ActionIcon, Box, Group, List, SimpleGrid, Stack, Text, Tooltip } from '@mantine/core';
 import { Dropzone } from '@mantine/dropzone';
-import { IconCheck, IconCloudUpload, IconDownload, IconFile, IconTrash, IconX } from '@tabler/icons-react';
+import { IconCheck, IconDownload, IconFile, IconPaperclip, IconTrash, IconX } from '@tabler/icons-react';
 import { useState } from 'react';
 import { BarChart } from './MiniBars';
+import { Money, Plate, Tag } from './ui';
 import { api, errorText } from '../api/client';
 import type { Application, DocumentInfo, StatementInfo } from '../api/types';
 import { fileSize, money, num, share, shortDate } from '../lib/format';
@@ -32,31 +33,31 @@ export function DocDropzone({ appId, docType, onUploaded, compact, label }: { ap
   };
   return (
     <Box>
-      <Dropzone onDrop={drop} loading={busy} maxSize={10 * 1024 * 1024} accept={docType === 'bank_statement' ? undefined : ACCEPT} onReject={() => setError('Файл не подходит: проверьте формат и размер (до 10 МБ)')} p={compact ? 'xs' : 'md'} radius="md">
-        <Group justify="center" gap="sm" mih={compact ? 36 : 70} style={{ pointerEvents: 'none' }}>
+      <Dropzone onDrop={drop} loading={busy} maxSize={10 * 1024 * 1024} accept={docType === 'bank_statement' ? undefined : ACCEPT} onReject={() => setError('Файл не подходит: проверьте формат и размер (до 10 МБ)')} p={compact ? 12 : 22}>
+        <Group justify={compact ? 'flex-start' : 'center'} gap="sm" wrap="nowrap" style={{ pointerEvents: 'none' }}>
           <Dropzone.Accept>
-            <IconCheck size={22} />
+            <IconCheck size={20} />
           </Dropzone.Accept>
           <Dropzone.Reject>
-            <IconX size={22} />
+            <IconX size={20} />
           </Dropzone.Reject>
           <Dropzone.Idle>
-            <IconCloudUpload size={22} color="var(--mantine-color-route-6)" />
+            <IconPaperclip size={20} color="var(--muted)" />
           </Dropzone.Idle>
-          <Box>
-            <Text size="sm" fw={600}>
-              {label ?? 'Перетащите файл или нажмите, чтобы выбрать'}
+          <Box style={{ minWidth: 0 }}>
+            <Text size="sm" fw={500}>
+              {compact ? (label ?? 'Прикрепить файл') : 'Перетащите файл или нажмите, чтобы выбрать'}
             </Text>
             {!compact && (
               <Text size="xs" c="dimmed">
-                {docType === 'bank_statement' ? 'Выгрузка 1С (kl_to_1c.txt) или CSV — обороты посчитаются автоматически' : 'PDF, JPG, PNG, DOCX, XLSX до 10 МБ'}
+                {docType === 'bank_statement' ? 'Выгрузка из 1С (kl_to_1c.txt) или CSV — выручку посчитаем автоматически' : 'PDF, JPG, PNG, DOCX, XLSX до 10 МБ'}
               </Text>
             )}
           </Box>
         </Group>
       </Dropzone>
       {error && (
-        <Text size="xs" c="signal" mt={4}>
+        <Text size="xs" c="bad" mt={4}>
           {error}
         </Text>
       )}
@@ -65,17 +66,20 @@ export function DocDropzone({ appId, docType, onUploaded, compact, label }: { ap
 }
 
 export function DocumentsList({ appId, docs, onDeleted, canDelete, bank }: { appId: string; docs: DocumentInfo[]; onDeleted?: (app: Application) => void; canDelete?: boolean; bank?: boolean }) {
-  if (!docs.length) return <Text size="sm" c="dimmed">Документы не загружены</Text>;
+  if (!docs.length)
+    return (
+      <Text size="sm" c="dimmed">
+        Документы не загружены
+      </Text>
+    );
   return (
-    <Stack gap={6}>
+    <div className="rows">
       {docs.map((d) => (
-        <Group key={d.id} justify="space-between" wrap="nowrap" p={8} style={{ border: '1px solid var(--line)', borderRadius: 10 }}>
+        <Group key={d.id} justify="space-between" wrap="nowrap" py={10} gap="sm">
           <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
-            <ThemeIcon variant="light" color={d.status === 'rejected' ? 'signal' : d.status === 'accepted' ? 'lime' : 'gray'}>
-              <IconFile size={16} />
-            </ThemeIcon>
+            <IconFile size={20} color={d.status === 'rejected' ? 'var(--bad)' : d.status === 'accepted' ? 'var(--ok)' : 'var(--muted)'} style={{ flex: 'none' }} />
             <Box style={{ minWidth: 0 }}>
-              <Text size="sm" fw={600} truncate>
+              <Text size="sm" fw={500} truncate>
                 {d.file_name}
               </Text>
               <Text size="xs" c="dimmed">
@@ -87,69 +91,82 @@ export function DocumentsList({ appId, docs, onDeleted, canDelete, bank }: { app
           </Group>
           <Group gap={2} wrap="nowrap">
             <Tooltip label="Скачать">
-              <ActionIcon variant="subtle" onClick={() => api.download(bank ? `/api/v1/bank/documents/${d.id}/file` : `/api/v1/applications/${appId}/documents/${d.id}/file`, d.file_name)} aria-label="Скачать">
-                <IconDownload size={16} />
+              <ActionIcon onClick={() => api.download(bank ? `/api/v1/bank/documents/${d.id}/file` : `/api/v1/applications/${appId}/documents/${d.id}/file`, d.file_name)} aria-label="Скачать">
+                <IconDownload size={17} />
               </ActionIcon>
             </Tooltip>
             {canDelete && onDeleted && (
               <Tooltip label="Удалить">
-                <ActionIcon variant="subtle" color="signal" aria-label="Удалить" onClick={async () => onDeleted(await api.del<Application>(`/api/v1/applications/${appId}/documents/${d.id}`))}>
-                  <IconTrash size={16} />
+                <ActionIcon color="bad" aria-label="Удалить" onClick={async () => onDeleted(await api.del<Application>(`/api/v1/applications/${appId}/documents/${d.id}`))}>
+                  <IconTrash size={17} />
                 </ActionIcon>
               </Tooltip>
             )}
           </Group>
         </Group>
       ))}
-    </Stack>
+    </div>
   );
 }
 
 /** Аналитика разобранной выписки: что система посчитала вместо клиента. */
 export function StatementCard({ st }: { st: StatementInfo }) {
   return (
-    <Stack gap="sm">
-      <Group gap={8}>
-        <Badge color="lime" leftSection={<IconCheck size={11} />}>
-          Выписка разобрана
-        </Badge>
+    <Plate size="sm">
+      <Stack gap="md">
+        <Group gap={8} wrap="wrap">
+          <Tag tone="ok" icon={<IconCheck size={12} />}>
+            Выписка разобрана
+          </Tag>
+          <Text size="xs" c="dimmed">
+            {st.format === '1c' ? 'формат 1С' : 'CSV'} · {shortDate(st.period.from)} — {shortDate(st.period.to)} · операций: {num(st.operations)}
+          </Text>
+        </Group>
+        <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm">
+          <Box>
+            <Text size="xs" c="dimmed">
+              Поступления в месяц
+            </Text>
+            <Money value={st.avg_monthly_incoming} size={18} />
+          </Box>
+          <Box>
+            <Text size="xs" c="dimmed">
+              Выручка за год, оценка
+            </Text>
+            <Money value={st.annualized_revenue} size={18} />
+          </Box>
+          <Box>
+            <Text size="xs" c="dimmed">
+              Колебания по месяцам
+            </Text>
+            <Text fw={700} className="display">
+              {st.turnover_volatility != null ? share(st.turnover_volatility, 0) : '—'}
+            </Text>
+          </Box>
+          <Box>
+            <Text size="xs" c="dimmed">
+              Платежи по кредитам
+            </Text>
+            <Text fw={700} className="display num">
+              {money(st.debt_payments_monthly)}/мес
+            </Text>
+          </Box>
+        </SimpleGrid>
+        <BarChart data={st.months.map((m) => ({ label: m.month.slice(5), value: m.incoming }))} />
         <Text size="xs" c="dimmed">
-          {st.format === '1c' ? 'формат 1С' : 'CSV'} · {shortDate(st.period.from)} — {shortDate(st.period.to)} · операций: {num(st.operations)}
+          Исключено из выручки: переводы между своими счетами {money(st.own_transfers_excluded)}, поступления кредитов {money(st.loan_proceeds_excluded)}.
+          {st.top_payer_share != null && ` Крупнейший покупатель — ${share(st.top_payer_share, 0)} поступлений (${st.payers_count} плательщиков).`}
         </Text>
-      </Group>
-      <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="xs">
-        <Box>
-          <Text size="xs" c="dimmed">Поступления в месяц</Text>
-          <Text fw={700} className="num">{money(st.avg_monthly_incoming)}</Text>
-        </Box>
-        <Box>
-          <Text size="xs" c="dimmed">Выручка за год (оценка)</Text>
-          <Text fw={700} className="num">{money(st.annualized_revenue)}</Text>
-        </Box>
-        <Box>
-          <Text size="xs" c="dimmed">Колебания по месяцам</Text>
-          <Text fw={700}>{st.turnover_volatility != null ? share(st.turnover_volatility, 0) : '—'}</Text>
-        </Box>
-        <Box>
-          <Text size="xs" c="dimmed">Платежи по кредитам</Text>
-          <Text fw={700} className="num">{money(st.debt_payments_monthly)}/мес</Text>
-        </Box>
-      </SimpleGrid>
-      <BarChart data={st.months.map((m) => ({ label: m.month.slice(5), value: m.incoming }))} />
-      <Text size="xs" c="dimmed">
-        Исключено из выручки: переводы между своими счетами {money(st.own_transfers_excluded)}, поступления кредитов {money(st.loan_proceeds_excluded)}.
-        {st.top_payer_share != null && ` Крупнейший покупатель — ${share(st.top_payer_share, 0)} поступлений (${st.payers_count} плательщиков).`}
-      </Text>
-      {st.warnings.length > 0 && (
-        <Alert color="amber" variant="light" p="xs">
-          <List size="xs">
-            {st.warnings.map((w) => (
-              <List.Item key={w}>{w}</List.Item>
-            ))}
-          </List>
-        </Alert>
-      )}
-      {st.months_covered < 6 && <Progress value={(st.months_covered / 6) * 100} color="amber" />}
-    </Stack>
+        {st.warnings.length > 0 && (
+          <Plate tone="warn" size="sm">
+            <List size="xs" spacing={2}>
+              {st.warnings.map((w) => (
+                <List.Item key={w}>{w}</List.Item>
+              ))}
+            </List>
+          </Plate>
+        )}
+      </Stack>
+    </Plate>
   );
 }

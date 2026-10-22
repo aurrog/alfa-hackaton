@@ -1,11 +1,11 @@
-import { Alert, Badge, Box, Button, Card, Code, Grid, Group, NumberInput, ScrollArea, SimpleGrid, Stack, Table, Text, Textarea, TextInput, Title } from '@mantine/core';
+import { Alert, Box, Button, Code, Grid, Group, NumberInput, ScrollArea, SimpleGrid, Stack, Table, Text, Textarea, TextInput, Title } from '@mantine/core';
 import { IconRefresh } from '@tabler/icons-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, errorText } from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
-import { ErrorAlert, Loading, PageHeader, Section, Stat } from '../../components/ui';
+import { ErrorAlert, Loading, PageTitle, Plate, Section, Stat, Status, Tag } from '../../components/ui';
 import { dateTime, num } from '../../lib/format';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -46,19 +46,21 @@ export function PolicyPage() {
   const changed = p.editable.filter((e: Any) => Number(values[e.key]) !== Number(e.value));
   return (
     <Stack gap="lg">
-      <PageHeader
-        eyebrow="Управление без релиза"
+      <PageTitle
         title={`Кредитная политика · версия ${p.version}`}
-        subtitle="Параметры решения хранятся версиями. Новая версия применяется к следующим решениям сразу; каждое решение ссылается на версию политики и модели — его можно воспроизвести."
+        sub="Параметры решения хранятся версиями и меняются без релиза. Новая версия применяется к следующим решениям сразу; каждое решение ссылается на версию политики и модели — его можно воспроизвести."
       />
       {saved && (
-        <Alert color="lime" variant="light" withCloseButton onClose={() => setSaved(null)}>
+        <Alert color="ok" withCloseButton onClose={() => setSaved(null)} mb="lg">
           Создана версия {saved}. Ставки в каталоге и новые решения уже используют её.
         </Alert>
       )}
       <Grid gutter="lg">
         <Grid.Col span={{ base: 12, md: 8 }}>
-          <Section title="Параметры">
+          <Plate>
+            <Title order={3} mb="md">
+              Параметры
+            </Title>
             <SimpleGrid cols={{ base: 1, sm: 2 }}>
               {p.editable.map((e: Any) => (
                 <NumberInput
@@ -71,14 +73,15 @@ export function PolicyPage() {
                   step={e.step}
                   decimalScale={e.type === 'money' || e.type === 'int' ? 0 : 2}
                   disabled={!canEdit}
-                  styles={Number(values[e.key]) !== Number(e.value) ? { input: { borderColor: 'var(--mantine-color-amber-5)' } } : undefined}
+                  variant="default"
+                  styles={Number(values[e.key]) !== Number(e.value) ? { input: { borderColor: 'var(--warn)', background: 'var(--warn-soft)' } } : undefined}
                 />
               ))}
             </SimpleGrid>
             {canEdit ? (
               <Stack mt="lg">
-                <Textarea label="Обоснование изменения" placeholder="Например: Банк России снизил ключевую ставку" value={comment} onChange={(e) => setComment(e.currentTarget.value)} autosize minRows={2} />
-                {error && <Alert color="signal" variant="light">{error}</Alert>}
+                <Textarea variant="default" label="Обоснование изменения" placeholder="Например: Банк России снизил ключевую ставку" value={comment} onChange={(e) => setComment(e.currentTarget.value)} autosize minRows={2} />
+                {error && <Alert color="bad">{error}</Alert>}
                 <Group justify="flex-end">
                   <Text size="sm" c="dimmed">
                     Изменено параметров: {changed.length}
@@ -93,21 +96,21 @@ export function PolicyPage() {
                 Изменять политику могут владелец продукта и риск-менеджер.
               </Text>
             )}
-          </Section>
-          <Section title="Полная конфигурация" mt="lg">
-            <Code block mah={320} style={{ overflow: 'auto' }}>
+          </Plate>
+          <Section title="Полная конфигурация" mt={32}>
+            <Code block mah={320} style={{ overflow: 'auto', borderRadius: 16 }}>
               {JSON.stringify(p.config, null, 2)}
             </Code>
           </Section>
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 4 }}>
           <Section title="История версий">
-            <Stack gap="sm">
+            <div className="rows">
               {p.history.map((h: Any) => (
-                <Box key={h.version}>
-                  <Group gap={6}>
+                <Box key={h.version} py={10}>
+                  <Group gap={8}>
                     <Text fw={700}>v{h.version}</Text>
-                    {h.is_active && <Badge color="lime">действует</Badge>}
+                    {h.is_active && <Tag tone="ok">действует</Tag>}
                   </Group>
                   <Text size="sm">{h.comment}</Text>
                   <Text size="xs" c="dimmed">
@@ -115,7 +118,7 @@ export function PolicyPage() {
                   </Text>
                 </Box>
               ))}
-            </Stack>
+            </div>
           </Section>
         </Grid.Col>
       </Grid>
@@ -128,16 +131,14 @@ export function AuditPage() {
   const q = useQuery({ queryKey: ['audit', action], queryFn: () => api.get<{ items: Any[] }>('/api/v1/bank/audit', { action, limit: 200 }), refetchInterval: 10000 });
   return (
     <Stack gap="lg">
-      <PageHeader eyebrow="Безопасность" title="Журнал аудита" subtitle="Входы, просмотры досье, решения, подписи, скачивание документов, изменения политики — с IP и идентификатором запроса." />
-      <Card padding="md">
-        <TextInput placeholder="Фильтр по действию: auth, dossier, bank, policy, document…" value={action} onChange={(e) => setAction(e.currentTarget.value)} maw={420} />
-      </Card>
-      <Card padding={0}>
+      <PageTitle title="Журнал аудита" sub="Входы, просмотры досье, решения, подписи, скачивание документов, изменения политики — с IP и идентификатором запроса." />
+      <TextInput placeholder="Фильтр по действию: auth, dossier, bank, policy, document…" value={action} onChange={(e) => setAction(e.currentTarget.value)} maw={420} />
+      <Box>
         {q.isLoading ? (
           <Loading />
         ) : (
           <ScrollArea>
-            <Table fz="sm" verticalSpacing={6} miw={900} striped>
+            <Table fz="sm" verticalSpacing={8} miw={900}>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Время</Table.Th>
@@ -153,9 +154,7 @@ export function AuditPage() {
                   <Table.Tr key={r.id}>
                     <Table.Td>{dateTime(r.created_at)}</Table.Td>
                     <Table.Td>
-                      <Badge variant="light" color={r.action.includes('failed') ? 'signal' : r.action.startsWith('bank') || r.action.startsWith('policy') ? 'violet' : 'gray'}>
-                        {r.action}
-                      </Badge>
+                      <Tag tone={r.action.includes('failed') ? 'bad' : r.action.startsWith('bank') || r.action.startsWith('policy') ? 'info' : ''}>{r.action}</Tag>
                     </Table.Td>
                     <Table.Td>{r.actor_email ?? '—'}</Table.Td>
                     <Table.Td>
@@ -173,7 +172,7 @@ export function AuditPage() {
             </Table>
           </ScrollArea>
         )}
-      </Card>
+      </Box>
     </Stack>
   );
 }
@@ -228,27 +227,30 @@ export function SystemPage() {
   );
   return (
     <Stack gap="lg">
-      <PageHeader
-        eyebrow="Надёжность"
+      <PageTitle
         title="Мониторинг конвейера"
-        subtitle="Очередь задач в PostgreSQL: повторы с паузой, «мёртвые письма» после исчерпания попыток, возврат зависших задач по истечении аренды. Метрики Prometheus — /metrics."
+        sub="Очередь задач в PostgreSQL: повторы с паузой, «мёртвые письма» после исчерпания попыток, возврат зависших задач по истечении аренды. Метрики Prometheus — /metrics."
       />
-      <SimpleGrid cols={{ base: 2, md: 5 }}>
+      <SimpleGrid cols={{ base: 2, md: 5 }} className="enter">
         <Stat label="В очереди" value={num(st.queued ?? 0)} />
-        <Stat label="Выполняются" value={num(st.running ?? 0)} color="route" />
-        <Stat label="Выполнено" value={num(st.done ?? 0)} color="lime.8" />
-        <Stat label="Неуспешные" value={num(st.failed ?? 0)} color={st.failed ? 'signal' : undefined} />
+        <Stat label="Выполняются" value={num(st.running ?? 0)} color="info" />
+        <Stat label="Выполнено" value={num(st.done ?? 0)} color="ok" />
+        <Stat label="Неуспешные" value={num(st.failed ?? 0)} color={st.failed ? 'bad' : undefined} />
         <Stat label="Задержка очереди" value={`${num(s.queue_lag_sec, 1)} с`} hint="самая старая задача" />
       </SimpleGrid>
-      <Section title="Повторы (временные сбои источников)">{s.retrying.length ? jobsTable(s.retrying, false) : <Text size="sm" c="dimmed">Сейчас нет задач на повторе.</Text>}</Section>
-      <Section title="Неуспешные задачи (dead letter)">{s.failed.length ? jobsTable(s.failed, true) : <Text size="sm" c="dimmed">Неуспешных задач нет.</Text>}</Section>
-      <Section title="Задачи по типам">
+      <Section title="Повторы — временные сбои источников" mt={12}>{s.retrying.length ? jobsTable(s.retrying, false) : <Text size="sm" c="dimmed">Сейчас нет задач на повторе.</Text>}</Section>
+      <Section title="Неуспешные задачи (dead letter)" mt={12}>{s.failed.length ? jobsTable(s.failed, true) : <Text size="sm" c="dimmed">Неуспешных задач нет.</Text>}</Section>
+      <Section title="Задачи по типам" mt={12}>
         <Table fz="sm">
           <Table.Tbody>
             {s.jobs_by_kind.map((r: Any) => (
               <Table.Tr key={r.kind + r.status}>
                 <Table.Td>{r.kind}</Table.Td>
-                <Table.Td>{r.status}</Table.Td>
+                <Table.Td>
+                  <Status tone={r.status === 'done' ? 'ok' : r.status === 'failed' ? 'bad' : r.status === 'running' ? 'info' : ''} size="sm">
+                    {r.status}
+                  </Status>
+                </Table.Td>
                 <Table.Td ta="right">{r.count}</Table.Td>
               </Table.Tr>
             ))}

@@ -39,37 +39,38 @@ export const LEVELS: Record<string, string> = {
   committee: 'Кредитный комитет',
 };
 
-export const OUTCOME: Record<string, { title: string; color: string }> = {
-  approve: { title: 'Одобрить', color: 'lime' },
-  counter_offer: { title: 'Одобрить на изменённых условиях', color: 'lime' },
-  decline: { title: 'Отказать', color: 'signal' },
-  refer: { title: 'Ручная проверка', color: 'violet' },
+export const OUTCOME: Record<string, { title: string; short: string; color: string }> = {
+  approve: { title: 'Одобрить', short: 'Одобрить', color: 'ok' },
+  counter_offer: { title: 'Одобрить на изменённых условиях', short: 'Другие условия', color: 'ok' },
+  decline: { title: 'Отказать', short: 'Отказать', color: 'bad' },
+  refer: { title: 'Ручная проверка', short: 'Ручная проверка', color: 'info' },
 };
 
 export const CHECK_RESULT: Record<string, { title: string; color: string }> = {
-  pass: { title: 'Пройдена', color: 'lime' },
-  warn: { title: 'Внимание', color: 'amber' },
-  fail: { title: 'Не пройдена', color: 'signal' },
-  unavailable: { title: 'Нет данных', color: 'gray' },
-  info: { title: 'Учтено', color: 'route' },
+  pass: { title: 'Пройдена', color: 'ok' },
+  warn: { title: 'Внимание', color: 'warn' },
+  fail: { title: 'Не пройдена', color: 'bad' },
+  unavailable: { title: 'Нет данных', color: '' },
+  info: { title: 'Учтено', color: 'info' },
 };
 
 export const SOURCE_STATUS: Record<string, { title: string; color: string }> = {
-  ok: { title: 'Получено', color: 'lime' },
-  not_found: { title: 'Нет записей', color: 'gray' },
-  retrying: { title: 'Повтор', color: 'amber' },
-  unavailable: { title: 'Недоступен', color: 'signal' },
-  error: { title: 'Ошибка', color: 'signal' },
-  timeout: { title: 'Таймаут', color: 'signal' },
-  circuit_open: { title: 'Предохранитель', color: 'signal' },
-  rejected: { title: 'Отклонено', color: 'amber' },
+  ok: { title: 'Получено', color: 'ok' },
+  not_found: { title: 'Нет записей', color: '' },
+  retrying: { title: 'Повтор', color: 'warn' },
+  unavailable: { title: 'Недоступен', color: 'bad' },
+  error: { title: 'Ошибка', color: 'bad' },
+  timeout: { title: 'Таймаут', color: 'bad' },
+  circuit_open: { title: 'Предохранитель', color: 'bad' },
+  rejected: { title: 'Отклонено', color: 'warn' },
 };
 
-export const GRADE_COLOR: Record<string, string> = { A: 'lime', B: 'teal', C: 'amber', D: 'orange', E: 'signal' };
+/** Цвет грейда риска (фон квадратика с буквой). */
+export const GRADE_HEX: Record<string, string> = { A: '#149c55', B: '#56b37a', C: '#d9a400', D: '#f08a00', E: '#d92d20' };
 
-/** Тон статуса (поле status_tone из API) → цвет Mantine. */
+/** Тон статуса (поле status_tone из API) → класс состояния: warn | info | ok | bad | '' (нейтральный). */
 export const TONE: Record<string, string> = {
-  gray: 'gray', yellow: 'amber', blue: 'route', orange: 'amber', violet: 'violet', green: 'lime', teal: 'teal', red: 'signal',
+  gray: '', yellow: 'warn', orange: 'warn', blue: 'info', violet: 'info', green: 'ok', teal: 'ok', red: 'bad',
 };
 
 export const MSP: Record<string, string> = { micro: 'Микропредприятие', small: 'Малое предприятие', medium: 'Среднее предприятие' };

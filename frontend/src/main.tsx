@@ -1,16 +1,15 @@
-import '@fontsource/onest/400.css';
-import '@fontsource/onest/500.css';
-import '@fontsource/onest/600.css';
-import '@fontsource/onest/700.css';
-import '@fontsource/unbounded/500.css';
-import '@fontsource/unbounded/600.css';
-import '@fontsource/unbounded/700.css';
+import '@fontsource/wix-madefor-text/400.css';
+import '@fontsource/wix-madefor-text/500.css';
+import '@fontsource/wix-madefor-text/600.css';
+import '@fontsource/wix-madefor-text/700.css';
+import '@fontsource/wix-madefor-display/600.css';
+import '@fontsource/wix-madefor-display/700.css';
 import '@mantine/core/styles.css';
 import '@mantine/dropzone/styles.css';
 import '@mantine/notifications/styles.css';
 import './styles.css';
 
-import { MantineProvider } from '@mantine/core';
+import { MantineProvider, type CSSVariablesResolver } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
@@ -31,9 +30,22 @@ const queryClient = new QueryClient({
   },
 });
 
+/** Нейтральные цвета текста и фона Mantine — под токены из styles.css. */
+const resolver: CSSVariablesResolver = () => ({
+  variables: {},
+  light: {
+    '--mantine-color-body': '#ffffff',
+    '--mantine-color-text': '#0e0f11',
+    '--mantine-color-dimmed': '#747883',
+    '--mantine-color-default-border': '#e6e8ec',
+    '--mantine-color-placeholder': '#9a9ea7',
+  },
+  dark: {},
+});
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <MantineProvider theme={theme} defaultColorScheme="light">
+    <MantineProvider theme={theme} cssVariablesResolver={resolver} forceColorScheme="light">
       <Notifications position="top-right" />
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>

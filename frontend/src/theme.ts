@@ -1,48 +1,77 @@
 import { createTheme, type MantineColorsTuple } from '@mantine/core';
 
 /*
- * Палитра «цвет = чей ход»:
- *   amber  — действие за клиентом
- *   violet — заявка у банка (специалист, комитет)
- *   route  — работает система (автоматический конвейер), основной цвет интерфейса
- *   lime   — готово / одобрено / выдано
- *   signal — отказ, ошибка, нарушен норматив
+ * Визуальный язык: белый фон, серые плашки без рамок и теней, чёрный текст, крупные цифры.
+ * Красный (brand) — только главное действие экрана и фирменные акценты.
+ * Цвета состояний:
+ *   warn — ход за клиентом, info — работает банк или система, ok — готово, bad — отказ и ошибки.
+ * У всех палитр «основной» оттенок — шестой (primaryShade), поэтому ink[6] — почти чёрный.
  */
-const route: MantineColorsTuple = ['#eaf1ff', '#d3e1ff', '#a6c1ff', '#759eff', '#4d81ff', '#3d7bff', '#2a62e6', '#1d50cc', '#1444a8', '#0b3484'];
-const amber: MantineColorsTuple = ['#fff6e1', '#ffeccb', '#ffd795', '#ffc05c', '#ffad2f', '#ffa112', '#ff9a00', '#e38600', '#ca7600', '#af6500'];
-const violet: MantineColorsTuple = ['#f3edff', '#e1d7fb', '#c0abf1', '#9d7ce8', '#8054e0', '#6d3bdc', '#6330da', '#5223c2', '#481dae', '#3c169a'];
-const lime: MantineColorsTuple = ['#f6fde7', '#ecf8d4', '#d7efaa', '#c1e67c', '#aede55', '#a2d93c', '#9bd72e', '#86bd20', '#76a817', '#638f08'];
-const signal: MantineColorsTuple = ['#ffe9ea', '#ffd1d3', '#fba1a4', '#f76e73', '#f34349', '#f1282f', '#f11921', '#d60b14', '#bf0010', '#a7000b'];
-const ink: MantineColorsTuple = ['#f4f5f8', '#e6e8ee', '#cbcfdb', '#adb3c6', '#939bb4', '#838ca9', '#7a84a4', '#68718f', '#5c6481', '#14161f'];
+const brand: MantineColorsTuple = ['#fff0ee', '#ffdcd8', '#ffb7af', '#ff8f83', '#fb6a5c', '#f54b3c', '#ef3124', '#d42a1e', '#b82216', '#9b1a10'];
+const ink: MantineColorsTuple = ['#f3f4f6', '#e9ebee', '#d9dce1', '#b9bdc6', '#8f949e', '#5f646e', '#0e0f11', '#2a2c31', '#060708', '#000000'];
+const ok: MantineColorsTuple = ['#e9f8ef', '#d3f0de', '#a6e1bd', '#75d09a', '#4cc27c', '#32b96a', '#149c55', '#108749', '#0b733d', '#065e31'];
+const warn: MantineColorsTuple = ['#fff4e5', '#ffe8cc', '#ffd099', '#ffb661', '#ffa033', '#ff9419', '#f08a00', '#d17800', '#b36600', '#945400'];
+const info: MantineColorsTuple = ['#eef3ff', '#dbe6ff', '#b5ccff', '#8bb0ff', '#6697fc', '#4d86f7', '#2f6fed', '#2259cf', '#1a4ab0', '#123a91'];
+const bad: MantineColorsTuple = ['#fdecea', '#fad6d2', '#f3aca5', '#ec7f75', '#e5584c', '#e03f32', '#d92d20', '#bd2318', '#a01b12', '#83130b'];
+
+const filled = { defaultProps: { variant: 'filled', radius: 'md' } };
 
 export const theme = createTheme({
-  primaryColor: 'route',
-  primaryShade: { light: 6, dark: 5 },
-  colors: { route, amber, violet, lime, signal, ink },
-  fontFamily: "Onest, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  primaryColor: 'ink',
+  primaryShade: 6,
+  colors: { brand, ink, ok, warn, info, bad },
+  black: '#0e0f11',
+  fontFamily: "'Wix Madefor Text', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
+  fontFamilyMonospace: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
   headings: {
-    fontFamily: "Unbounded, Onest, -apple-system, 'Segoe UI', sans-serif",
-    fontWeight: '600',
-    sizes: { h1: { fontSize: '1.9rem', lineHeight: '1.2' }, h2: { fontSize: '1.45rem' }, h3: { fontSize: '1.15rem' }, h4: { fontSize: '1rem' } },
+    fontFamily: "'Wix Madefor Display', 'Wix Madefor Text', -apple-system, 'Segoe UI', sans-serif",
+    fontWeight: '700',
+    sizes: {
+      h1: { fontSize: '2.25rem', lineHeight: '1.1' },
+      h2: { fontSize: '1.625rem', lineHeight: '1.15' },
+      h3: { fontSize: '1.25rem', lineHeight: '1.25' },
+      h4: { fontSize: '1.0625rem', lineHeight: '1.3' },
+    },
   },
+  fontSizes: { xs: '12px', sm: '14px', md: '15px', lg: '17px', xl: '20px' },
   defaultRadius: 'md',
-  radius: { md: '10px', lg: '16px' },
+  radius: { xs: '6px', sm: '8px', md: '12px', lg: '20px', xl: '28px' },
   cursorType: 'pointer',
   components: {
-    Card: { defaultProps: { withBorder: true, radius: 'lg', padding: 'lg' } },
     Button: { defaultProps: { radius: 'md' } },
-    Badge: { defaultProps: { radius: 'sm', variant: 'light' } },
+    ActionIcon: { defaultProps: { radius: 'md', variant: 'subtle', color: 'ink' } },
+    TextInput: filled,
+    PasswordInput: filled,
+    Textarea: filled,
+    Select: filled,
+    MultiSelect: filled,
+    NumberInput: { defaultProps: { variant: 'filled', radius: 'md', thousandSeparator: ' ', decimalSeparator: ',' } },
+    Card: { defaultProps: { radius: 'lg', padding: 'lg', withBorder: false } },
     Paper: { defaultProps: { radius: 'lg' } },
-    Tooltip: { defaultProps: { withArrow: true, multiline: true, maw: 320 } },
-    NumberInput: { defaultProps: { thousandSeparator: ' ', decimalSeparator: ',' } },
+    Badge: { defaultProps: { radius: 'sm', variant: 'light' } },
+    Modal: { defaultProps: { radius: 'lg', centered: true, padding: 'xl', overlayProps: { backgroundOpacity: 0.4 } } },
+    Drawer: { defaultProps: { overlayProps: { backgroundOpacity: 0.3 } } },
+    Tooltip: { defaultProps: { withArrow: true, multiline: true, maw: 320, color: 'ink' } },
+    Popover: { defaultProps: { radius: 'md', shadow: 'md' } },
+    Menu: { defaultProps: { radius: 'md', shadow: 'md' } },
+    SegmentedControl: { defaultProps: { radius: 'md' } },
+    Tabs: { defaultProps: { color: 'ink' } },
+    Slider: { defaultProps: { color: 'brand', size: 'sm' } },
+    Checkbox: { defaultProps: { color: 'ink', radius: 'sm' } },
+    Switch: { defaultProps: { color: 'ink' } },
+    Chip: { defaultProps: { color: 'ink', radius: 'md' } },
+    Progress: { defaultProps: { radius: 'xl' } },
+    Accordion: { defaultProps: { radius: 'lg' } },
+    Alert: { defaultProps: { radius: 'md', variant: 'light' } },
+    Table: { defaultProps: { verticalSpacing: 'sm', horizontalSpacing: 'md' } },
   },
 });
 
-/** Цвет по тому, чей сейчас ход (поле waiting из API). */
-export const WAITING_COLOR: Record<string, string> = { client: 'amber', bank: 'violet', system: 'route', none: 'gray' };
+/** Цвет и подпись по тому, чей сейчас ход (поле waiting из API). */
+export const WAITING_COLOR: Record<string, string> = { client: 'warn', bank: 'info', system: 'info', none: 'ink' };
 export const WAITING_TITLE: Record<string, string> = {
   client: 'Ход за вами',
   bank: 'Работает банк',
-  system: 'Автоматическая обработка',
+  system: 'Автоматическая проверка',
   none: 'Завершено',
 };

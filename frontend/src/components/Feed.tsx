@@ -1,5 +1,5 @@
-import { ActionIcon, Anchor, Badge, Button, Card, Chip, Collapse, Group, Modal, Stack, Text, Title, Tooltip } from '@mantine/core';
-import { IconAdjustmentsHorizontal, IconEyeOff, IconSparkles, IconThumbUp } from '@tabler/icons-react';
+import { ActionIcon, Box, Button, Chip, Group, Modal, Stack, Text, Title, Tooltip } from '@mantine/core';
+import { IconAdjustmentsHorizontal, IconEyeOff, IconThumbUp } from '@tabler/icons-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -8,22 +8,24 @@ import type { Feed as FeedT, FeedCard } from '../api/types';
 import { date } from '../lib/format';
 import { Loading } from './ui';
 
-const CAT_COLOR: Record<string, string> = {
-  insight: 'route', support: 'lime', taxes: 'amber', market: 'violet', product: 'route', education: 'teal', regulation: 'orange', industry: 'grape',
-};
+function Why({ c }: { c: FeedCard }) {
+  return (
+    <Text className="why">
+      Почему вы это видите:{' '}
+      {c.why.map((w, i) => (
+        <span key={i}>
+          {i > 0 && ' · '}
+          <b>{w}</b>
+        </span>
+      ))}
+    </Text>
+  );
+}
 
-function Card1({ c, companyId }: { c: FeedCard; companyId: string }) {
+function Card1({ c, companyId, onOpen }: { c: FeedCard; companyId: string; onOpen: (c: FeedCard) => void }) {
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [why, setWhy] = useState(false);
   const [liked, setLiked] = useState(!!c.liked);
-  const act = useMutation({
-    mutationFn: (action: string) => api.post(`/api/v1/feed/actions?company_id=${companyId}`, { news_id: c.id, action }),
-  });
-  const toggle = () => {
-    if (!open && c.type === 'news') act.mutate('open');
-    setOpen((o) => !o);
-  };
+  const act = useMutation({ mutationFn: (action: string) => api.post(`/api/v1/feed/actions?company_id=${companyId}`, { news_id: c.id, action }) });
   const hide = async () => {
     await act.mutateAsync('hide');
     void qc.invalidateQueries({ queryKey: ['feed', companyId] });
@@ -32,87 +34,59 @@ function Card1({ c, companyId }: { c: FeedCard; companyId: string }) {
     setLiked(true);
     await act.mutateAsync('like');
   };
+  const open = () => {
+    if (c.type === 'news') act.mutate('open');
+    onOpen(c);
+  };
   return (
-    <Card className="feed-card" padding="md" style={c.type === 'insight' ? { borderColor: 'var(--mantine-color-route-3)' } : undefined}>
-      <Group justify="space-between" wrap="nowrap" align="flex-start" gap="xs">
-        <Group gap={6}>
-          <Badge color={CAT_COLOR[c.category] ?? 'gray'} leftSection={c.type === 'insight' ? <IconSparkles size={11} /> : undefined}>
-            {c.category_title}
-          </Badge>
-          {c.published_at && (
-            <Text size="xs" c="dimmed">
-              {date(c.published_at)}
-            </Text>
-          )}
-        </Group>
-        <Group gap={2} wrap="nowrap">
+    <article className="feed-card">
+      <Group justify="space-between" wrap="nowrap" gap={6}>
+        <Text size="xs" c="dimmed" truncate>
+          {c.type === 'insight' ? 'Для вас' : c.category_title}
+          {c.published_at ? ` · ${date(c.published_at)}` : ''}
+        </Text>
+        <Group gap={0} wrap="nowrap" className="acts">
           {c.type === 'news' && (
-            <Tooltip label={liked ? 'Покажем больше похожего' : 'Полезно — показывать больше похожего'}>
-              <ActionIcon variant={liked ? 'light' : 'subtle'} color={liked ? 'lime' : 'gray'} size="sm" onClick={like} aria-label="Полезно">
+            <Tooltip label={liked ? 'Покажем больше похожего' : 'Полезно'}>
+              <ActionIcon size="sm" color={liked ? 'ok' : 'ink'} variant="subtle" onClick={like} aria-label="Полезно">
                 <IconThumbUp size={15} />
               </ActionIcon>
             </Tooltip>
           )}
           <Tooltip label="Скрыть и показывать меньше такого">
-            <ActionIcon variant="subtle" color="gray" size="sm" onClick={hide} aria-label="Скрыть">
+            <ActionIcon size="sm" variant="subtle" onClick={hide} aria-label="Скрыть">
               <IconEyeOff size={15} />
             </ActionIcon>
           </Tooltip>
         </Group>
       </Group>
-      <Text fw={700} mt={8} style={{ cursor: c.body ? 'pointer' : undefined }} onClick={c.body ? toggle : undefined}>
+      <Text fw={600} fz={15.5} lh={1.3} style={{ cursor: 'pointer' }} onClick={open}>
         {c.title}
       </Text>
-      <Text size="sm" c="dimmed" mt={4}>
+      <Text size="sm" c="var(--ink-2)" lineClamp={3} lh={1.45}>
         {c.summary}
       </Text>
-      {c.body && (
-        <Collapse in={open}>
-          <Text size="sm" mt="xs">
-            {c.body}
-          </Text>
-          {c.source && (
-            <Text size="xs" c="dimmed" mt={4}>
-              Источник: {c.source}
-            </Text>
-          )}
-        </Collapse>
-      )}
-      <Group justify="space-between" mt="sm" gap="xs">
-        <Anchor component="button" size="xs" c="dimmed" onClick={() => setWhy((w) => !w)}>
-          Почему вы это видите
-        </Anchor>
-        <Group gap="xs">
-          {c.body && (
-            <Button size="compact-xs" variant="subtle" onClick={toggle}>
-              {open ? 'Свернуть' : 'Читать'}
-            </Button>
-          )}
-          {c.cta && (
-            <Button size="compact-xs" variant="light" component={Link} to={c.cta.link}>
-              {c.cta.label}
-            </Button>
-          )}
-        </Group>
+      <Group gap={14} mt="auto" pt={6}>
+        {c.body && (
+          <button type="button" className="link-btn" onClick={open} style={{ fontSize: 13.5 }}>
+            Читать
+          </button>
+        )}
+        {c.cta && (
+          <Link to={c.cta.link} className="link-btn" style={{ fontSize: 13.5, fontWeight: 600 }}>
+            {c.cta.label}
+          </Link>
+        )}
       </Group>
-      <Collapse in={why}>
-        <Text className="why" mt={6}>
-          {c.why.map((w, i) => (
-            <span key={i}>
-              {i > 0 && ' · '}
-              <b>{w}</b>
-            </span>
-          ))}
-          {c.type === 'news' && ` · релевантность ${c.relevance.toFixed(1).replace('.', ',')}`}
-        </Text>
-      </Collapse>
-    </Card>
+    </article>
   );
 }
 
 export function Feed({ companyId, limit }: { companyId: string; limit?: number }) {
   const qc = useQueryClient();
   const [settings, setSettings] = useState(false);
+  const [all, setAll] = useState(false);
+  const [opened, setOpened] = useState<FeedCard | null>(null);
   const q = useQuery({ queryKey: ['feed', companyId], queryFn: () => api.get<FeedT>('/api/v1/feed', { company_id: companyId }) });
   const [topics, setTopics] = useState<string[]>([]);
   useEffect(() => {
@@ -125,51 +99,88 @@ export function Feed({ companyId, limit }: { companyId: string; limit?: number }
       void qc.invalidateQueries({ queryKey: ['feed', companyId] });
     },
   });
-  if (q.isLoading) return <Loading text="Собираем ленту под ваш бизнес…" />;
+  if (q.isLoading) return <Loading text="Собираем подборку под ваш бизнес…" />;
   if (!q.data) return null;
   const p = q.data.profile;
-  const cards = limit ? q.data.cards.slice(0, limit) : q.data.cards;
+  const cards = limit && !all ? q.data.cards.slice(0, limit) : q.data.cards;
   return (
-    <Stack gap="sm">
-      <Group justify="space-between" align="flex-end">
-        <div>
-          <Title order={3}>Лента для вашего бизнеса</Title>
-          <Text size="xs" c="dimmed" mt={4}>
-            {p.sector} · {p.region} · {p.legal_form}
+    <Box>
+      <Group justify="space-between" align="flex-end" mb={12} wrap="nowrap">
+        <Box>
+          <Title order={3}>Полезное для вашего бизнеса</Title>
+          <Text size="sm" c="dimmed" mt={4}>
+            Подборка под профиль: {p.sector.toLowerCase()} · {p.region} · {p.legal_form}
             {p.bank_client ? ' · клиент банка' : ''}
           </Text>
-        </div>
-        <Tooltip label="Выбрать темы">
-          <ActionIcon variant="light" onClick={() => setSettings(true)} aria-label="Настроить ленту">
-            <IconAdjustmentsHorizontal size={18} />
-          </ActionIcon>
-        </Tooltip>
+        </Box>
+        <Button variant="default" size="xs" leftSection={<IconAdjustmentsHorizontal size={15} />} onClick={() => setSettings(true)}>
+          Темы
+        </Button>
       </Group>
-      {cards.map((c) => (
-        <Card1 key={c.id} c={c} companyId={companyId} />
-      ))}
-      <Text size="xs" c="dimmed">
-        Демонстрационная лента: материалы синтетические и показывают механику персонализации.
-      </Text>
-      <Modal opened={settings} onClose={() => setSettings(false)} title={<Text fw={700}>Темы ленты</Text>} centered>
-        <Text size="sm" c="dimmed" mb="sm">
-          Отметьте интересные темы — они получат приоритет. Лента также учится на ваших реакциях «Полезно» и «Скрыть».
+      <div className="feed-grid">
+        {cards.map((c) => (
+          <Card1 key={c.id} c={c} companyId={companyId} onOpen={setOpened} />
+        ))}
+      </div>
+      <Group justify="space-between" mt={12}>
+        <Text size="xs" c="dimmed">
+          Материалы демонстрационные: показывают механику персонализации. Лента учится на реакциях «Полезно» и «Скрыть».
+        </Text>
+        {limit && q.data.cards.length > limit && (
+          <button type="button" className="link-btn" onClick={() => setAll((a) => !a)} style={{ fontSize: 14 }}>
+            {all ? 'Свернуть' : `Показать все (${q.data.cards.length})`}
+          </button>
+        )}
+      </Group>
+
+      <Modal opened={!!opened} onClose={() => setOpened(null)} size="lg" title={opened?.type === 'insight' ? 'Для вас' : opened?.category_title}>
+        {opened && (
+          <Stack gap="sm">
+            <Title order={3}>{opened.title}</Title>
+            <Text size="sm" c="var(--ink-2)">
+              {opened.summary}
+            </Text>
+            {opened.body && (
+              <Text size="sm" lh={1.6}>
+                {opened.body}
+              </Text>
+            )}
+            {opened.source && (
+              <Text size="xs" c="dimmed">
+                Источник: {opened.source}
+              </Text>
+            )}
+            <Why c={opened} />
+            {opened.cta && (
+              <Group mt="sm">
+                <Button component={Link} to={opened.cta.link} onClick={() => setOpened(null)}>
+                  {opened.cta.label}
+                </Button>
+              </Group>
+            )}
+          </Stack>
+        )}
+      </Modal>
+
+      <Modal opened={settings} onClose={() => setSettings(false)} title="Темы подборки">
+        <Text size="sm" c="dimmed" mb="md">
+          Отметьте интересные темы — они получат приоритет.
         </Text>
         <Chip.Group multiple value={topics} onChange={setTopics}>
           <Group gap={6}>
             {q.data.topics.map((t) => (
-              <Chip key={t.code} value={t.code} size="sm">
+              <Chip key={t.code} value={t.code} size="sm" variant="light">
                 {t.title}
               </Chip>
             ))}
           </Group>
         </Chip.Group>
-        <Group justify="flex-end" mt="lg">
+        <Group justify="flex-end" mt="xl">
           <Button onClick={() => save.mutate()} loading={save.isPending}>
             Сохранить
           </Button>
         </Group>
       </Modal>
-    </Stack>
+    </Box>
   );
 }

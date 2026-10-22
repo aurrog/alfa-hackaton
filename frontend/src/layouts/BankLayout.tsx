@@ -1,4 +1,4 @@
-import { AppShell, Avatar, Badge, Box, Burger, Group, NavLink as MNavLink, ScrollArea, Stack, Text, UnstyledButton } from '@mantine/core';
+import { AppShell, Avatar, Box, Burger, Group, ScrollArea, Stack, Text, UnstyledButton } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconActivityHeartbeat, IconChartBar, IconHistory, IconListCheck, IconLogout, IconScale } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
@@ -26,60 +26,69 @@ export function BankLayout() {
     { to: '/bank/system', label: 'Мониторинг конвейера', icon: IconActivityHeartbeat },
     ...(policyRole ? [{ to: '/bank/audit', label: 'Журнал аудита', icon: IconHistory }] : []),
   ];
+  const initials = user?.full_name.split(' ').slice(0, 2).map((s) => s[0]).join('');
   return (
-    <AppShell navbar={{ width: 250, breakpoint: 'sm', collapsed: { mobile: !opened } }} header={{ height: { base: 56, sm: 0 } }} padding="md">
-      <AppShell.Header hiddenFrom="sm" px="md">
-        <Group h="100%">
+    <AppShell navbar={{ width: 264, breakpoint: 'sm', collapsed: { mobile: !opened } }} header={{ height: { base: 60, sm: 0 } }} padding={0}>
+      <AppShell.Header hiddenFrom="sm" px="md" style={{ borderBottom: '1px solid var(--line)' }}>
+        <Group h="100%" gap="sm">
           <Burger opened={opened} onClick={toggle} size="sm" aria-label="Меню" />
           <Logo sub="рабочее место банка" />
         </Group>
       </AppShell.Header>
-      <AppShell.Navbar p="sm" bg="ink.9" style={{ borderRight: 0 }}>
-        <Box px="xs" py="sm" visibleFrom="sm">
-          <Logo sub="рабочее место банка" inverted />
+      <AppShell.Navbar p="md" style={{ borderRight: '1px solid var(--line)' }}>
+        <Box px={6} pt={4} pb="lg" visibleFrom="sm">
+          <Logo sub="рабочее место банка" />
         </Box>
-        <ScrollArea style={{ flex: 1 }} mt="sm">
+        <ScrollArea style={{ flex: 1 }}>
           <Stack gap={2}>
             {items.map((it) => {
               const active = it.exact ? loc.pathname === it.to || loc.pathname.startsWith('/bank/applications') : loc.pathname.startsWith(it.to);
               return (
-                <MNavLink
+                <UnstyledButton
                   key={it.to}
                   component={NavLink}
                   to={it.to}
-                  label={it.label}
                   onClick={close}
-                  leftSection={<it.icon size={18} />}
-                  rightSection={it.badge ? <Badge size="sm" color="violet" variant="filled">{it.badge}</Badge> : undefined}
-                  active={active}
-                  variant="filled"
-                  color="route"
-                  style={{ borderRadius: 8, color: active ? undefined : '#c9cee0' }}
-                />
+                  px={12}
+                  py={10}
+                  style={{ borderRadius: 12, background: active ? 'var(--plate)' : undefined, color: active ? 'var(--ink)' : 'var(--ink-2)' }}
+                >
+                  <Group gap={12} wrap="nowrap">
+                    <it.icon size={19} stroke={1.7} />
+                    <Text size="sm" fw={active ? 600 : 500} style={{ flex: 1 }}>
+                      {it.label}
+                    </Text>
+                    {!!it.badge && (
+                      <Text size="xs" fw={700} c="#fff" bg="var(--ink)" px={7} py={1} style={{ borderRadius: 10 }}>
+                        {it.badge}
+                      </Text>
+                    )}
+                  </Group>
+                </UnstyledButton>
               );
             })}
           </Stack>
         </ScrollArea>
-        <UnstyledButton onClick={logout} p="xs" style={{ borderTop: '1px solid #2a2f40' }}>
+        <UnstyledButton onClick={logout} p={10} mt="sm" style={{ borderRadius: 12, background: 'var(--plate)' }} aria-label="Выйти">
           <Group gap="sm" wrap="nowrap">
-            <Avatar color="violet" radius="xl">
-              {user?.full_name.split(' ').slice(0, 2).map((s) => s[0]).join('')}
+            <Avatar color="ink" variant="filled" radius="xl" size={36}>
+              {initials}
             </Avatar>
             <Box style={{ minWidth: 0, flex: 1 }}>
-              <Text size="sm" fw={600} c="white" truncate>
+              <Text size="sm" fw={600} truncate>
                 {user?.full_name}
               </Text>
-              <Text size="xs" c="#9aa2b8" truncate>
+              <Text size="xs" c="dimmed" truncate>
                 {user?.role_title}
                 {user?.authority_limit ? ` · до ${money(user.authority_limit)}` : ''}
               </Text>
             </Box>
-            <IconLogout size={16} color="#9aa2b8" />
+            <IconLogout size={17} color="var(--muted)" />
           </Group>
         </UnstyledButton>
       </AppShell.Navbar>
       <AppShell.Main>
-        <Box maw={1400} mx="auto">
+        <Box maw={1440} mx="auto" px={{ base: 16, sm: 32 }} py={{ base: 20, sm: 36 }}>
           <Outlet />
         </Box>
       </AppShell.Main>

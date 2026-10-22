@@ -1,49 +1,35 @@
-import { Group, Text, Tooltip } from '@mantine/core';
+import type { CSSProperties } from 'react';
 import type { Stage } from '../api/types';
 
-const STATE_TEXT: Record<Stage['state'], string> = {
-  done: 'готово',
-  current: 'сейчас',
-  upcoming: 'впереди',
-  failed: 'остановлено',
-  skipped: '—',
-};
-
-/** Маршрут заявки: шесть шагов, цвет текущего шага — «чей ход». */
-export function RouteMap({ stages, waiting, compact, hint }: { stages: Stage[]; waiting: string; compact?: boolean; hint?: string }) {
-  if (compact) {
-    return (
-      <div className="route compact" aria-label="Маршрут заявки">
-        {stages.map((s) => (
-          <Tooltip key={s.key} label={`${s.title}: ${STATE_TEXT[s.state]}`}>
-            <div className={`route-step ${s.state} ${s.state === 'current' ? waiting : ''}`}>
-              <div className="bar" />
-            </div>
-          </Tooltip>
-        ))}
-      </div>
-    );
-  }
+/**
+ * Маршрут заявки как трекер доставки: сегменты этапов, текущий окрашен по тому, чей ход
+ * (оранжевый — клиент, синий — банк, синие полосы в движении — работает автоматика).
+ */
+export function RouteMap({ stages, waiting, compact }: { stages: Stage[]; waiting: string; compact?: boolean }) {
+  const style = { '--n': stages.length } as CSSProperties;
   return (
     <div>
-      <div className="route" role="list" aria-label="Маршрут заявки">
+      <div className={`track${compact ? ' thin' : ''}`} style={style} aria-label="Маршрут заявки">
         {stages.map((s, i) => (
-          <div key={s.key} role="listitem" className={`route-step ${s.state} ${s.state === 'current' ? waiting : ''}`}>
-            <div className="bar" />
-            <div className="title">
-              {i + 1}. {s.title}
-            </div>
-            <div className="state">{STATE_TEXT[s.state]}</div>
-          </div>
+          <div key={s.key} className={`seg ${s.state} ${s.state === 'current' ? waiting : ''}`} title={s.title} style={{ '--i': i } as CSSProperties} />
         ))}
       </div>
-      {hint && (
-        <Group mt="sm" gap={6}>
-          <Text size="sm" c="dimmed">
-            {hint}
-          </Text>
-        </Group>
+      {!compact && (
+        <div className="track-labels" style={style}>
+          {stages.map((s) => (
+            <span key={s.key} className={s.state}>
+              {s.title}
+            </span>
+          ))}
+        </div>
       )}
     </div>
   );
+}
+
+/** Текущий этап для мобильной подписи: «Этап 3 из 6 · Оценка». */
+export function currentStage(stages: Stage[]): { index: number; title: string } | null {
+  const i = stages.findIndex((s) => s.state === 'current' || s.state === 'failed');
+  if (i < 0) return null;
+  return { index: i, title: stages[i].title };
 }
