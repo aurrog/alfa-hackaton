@@ -68,6 +68,39 @@ def test_recommend_adjusts_term_and_minimum():
     assert any("Срок скорректирован" in w for w in r["warnings"])
 
 
+def test_recommend_does_not_push_amount_up():
+    """Продукт, минимум которого выше запроса, не становится «лучшим» — только альтернативой."""
+    recs = recommend([GOV, EXPRESS], Need(purpose="equipment", amount=2_000_000, term_months=24, urgent=True),
+                     company(okved_code="25.62"), 14.0, today=TODAY)
+    assert recs[0]["code"] == "EXPRESS" and recs[0]["amount"] == 2_000_000
+    gov = next(r for r in recs if r["code"] == "GOV")
+    assert gov["eligible"] and gov["amount"] == 3_000_000
+    assert any("Минимальная сумма" in w for w in gov["warnings"])
+
+
+def test_recommend_prefers_requested_term():
+    """Оборудование на 5 лет: инвестиционный кредит с нужным сроком лучше оборотного, урезающего срок до 3 лет."""
+    working = ProductSpec(code="WORKING", name="Оборотный", kind="term_loan", purposes=["working_capital", "contract", "any"],
+                          min_amount=1_000_000, max_amount=50_000_000, min_term=6, max_term=36, rate_spread=5.0,
+                          collateral_required_from=15_000_000)
+    invest = ProductSpec(code="INVEST", name="Инвестиционный", kind="term_loan", purposes=["equipment", "expansion"],
+                         min_amount=3_000_000, max_amount=150_000_000, min_term=12, max_term=84, rate_spread=4.5,
+                         collateral_required_from=10_000_000, auto_decision=False)
+    recs = recommend([working, invest], Need(purpose="equipment", amount=40_000_000, term_months=60, urgent=True,
+                                             has_collateral=True), company(legal_form="LE"), 14.0, today=TODAY)
+    assert recs[0]["code"] == "INVEST" and recs[0]["term_months"] == 60
+    assert any("Срок скорректирован" in w for w in recs[1]["warnings"])
+
+
+def test_recommend_tie_breaks_by_rate():
+    cheap = ProductSpec(code="CHEAP", name="Дешёвый", kind="term_loan", purposes=["any"], min_amount=1, max_amount=10_000_000,
+                        min_term=1, max_term=60, rate_spread=3.0)
+    dear = ProductSpec(code="DEAR", name="Дорогой", kind="term_loan", purposes=["any"], min_amount=1, max_amount=10_000_000,
+                       min_term=1, max_term=60, rate_spread=7.0)
+    recs = recommend([dear, cheap], Need(purpose="any", amount=1_000_000, term_months=12), company(), 14.0, today=TODAY)
+    assert [r["code"] for r in recs] == ["CHEAP", "DEAR"]
+
+
 # ------------------------------------------------------------------ лента
 def profile(**kw):
     base = dict(sector_key="food_service", sector_name="Общественное питание", region_code="16",

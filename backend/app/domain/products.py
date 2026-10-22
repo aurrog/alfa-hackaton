@@ -122,12 +122,16 @@ def recommend(products: list[ProductSpec], need: Need, company: CompanyProfile, 
 
         term = min(max(need.term_months, p.min_term), p.max_term)
         if term != need.term_months:
+            # продукт не даёт нужный срок — платёж будет другим, чем клиент рассчитывал
+            score -= 2
             warnings.append(f"Срок скорректирован до {term} мес. (условия продукта)")
         amount = need.amount
         blockers = eligibility(p, company, None, None, today)
         if amount > p.max_amount:
             blockers.append(f"Максимальная сумма по продукту — {p.max_amount:,.0f} ₽".replace(",", " "))
         if amount < p.min_amount:
+            # не навязываем больше, чем нужно: продукт с минимумом выше запроса — только альтернатива
+            score -= 2
             warnings.append(f"Минимальная сумма — {p.min_amount:,.0f} ₽".replace(",", " "))
             amount = p.min_amount
 
@@ -177,7 +181,8 @@ def recommend(products: list[ProductSpec], need: Need, company: CompanyProfile, 
             "monthly_payment_from": round(payment, 2),
             "payment_kind": "annuity" if p.kind == "term_loan" else "interest_only",
         })
-    out.sort(key=lambda r: (not r["eligible"], -r["score"]))
+    # при равных баллах выше — продукт с меньшей ставкой
+    out.sort(key=lambda r: (not r["eligible"], -r["score"], r["rate_from"]))
     if out and out[0]["eligible"]:
         out[0]["best"] = True
     return out
