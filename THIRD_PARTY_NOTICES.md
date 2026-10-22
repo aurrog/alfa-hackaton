@@ -44,8 +44,8 @@
 
 | Компонент | Лицензия |
 |---|---|
-| Onest (`@fontsource/onest`) | SIL Open Font License 1.1 |
-| Unbounded (`@fontsource/unbounded`) | SIL Open Font License 1.1 |
+| Wix Madefor Text (`@fontsource/wix-madefor-text`) | SIL Open Font License 1.1 |
+| Wix Madefor Display (`@fontsource/wix-madefor-display`) | SIL Open Font License 1.1 |
 | Tabler Icons (`@tabler/icons-react`) | MIT |
 | DejaVu Sans (только для генерации тестовых PDF) | Bitstream Vera / DejaVu License |
 
@@ -167,8 +167,8 @@
 | @floating-ui/react | 0.26.28 | MIT | приложение |
 | @floating-ui/react-dom | 2.1.9 | MIT | приложение |
 | @floating-ui/utils | 0.2.12 | MIT | приложение |
-| @fontsource/onest | 5.3.1 | OFL-1.1 | приложение |
-| @fontsource/unbounded | 5.3.0 | OFL-1.1 | приложение |
+| @fontsource/wix-madefor-display | 5.3.0 | OFL-1.1 | приложение |
+| @fontsource/wix-madefor-text | 5.3.0 | OFL-1.1 | приложение |
 | @jridgewell/gen-mapping | 0.3.13 | MIT | сборка |
 | @jridgewell/remapping | 2.3.5 | MIT | сборка |
 | @jridgewell/resolve-uri | 3.1.2 | MIT | сборка |
