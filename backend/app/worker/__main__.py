@@ -25,7 +25,7 @@ def main() -> None:
     signal.signal(signal.SIGTERM, _graceful)
     signal.signal(signal.SIGINT, _graceful)
     with contextlib.suppress(OSError):
-        start_http_server(s.worker_metrics_port)
+        start_http_server(s.worker_metrics_port, addr=s.worker_metrics_host)
     loop(session_factory(), stop.is_set)
 
 

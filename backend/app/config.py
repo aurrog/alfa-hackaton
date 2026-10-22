@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     worker_poll_interval_sec: float = 0.5
     worker_id: str = Field(default_factory=socket.gethostname)
     worker_metrics_port: int = 9100
+    worker_metrics_host: str = "0.0.0.0"
     job_max_attempts: int = 4
     job_lease_sec: int = 300
 

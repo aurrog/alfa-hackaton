@@ -49,7 +49,7 @@
 | Tabler Icons (`@tabler/icons-react`) | MIT |
 | DejaVu Sans (только для генерации тестовых PDF) | Bitstream Vera / DejaVu License |
 
-## 5. Python — бэкенд (`backend/requirements.lock`, 39 пакетов)
+## 5. Python — бэкенд (`backend/requirements.lock`, 40 пакетов)
 
 | Пакет | Версия | Лицензия |
 |---|---|---|
@@ -88,15 +88,17 @@
 | starlette | 1.9.0 | BSD-3-Clause |
 | typing-extensions | 4.16.0 | PSF-2.0 |
 | typing-inspection | 0.4.4 | MIT |
+| tzdata | 2026.5 | см. PyPI |
 | uvicorn | 0.54.0 | BSD-3-Clause |
 | uvloop | 0.23.0 | MIT License |
 | watchfiles | 1.3.0 | MIT |
 | websockets | 17.3 | BSD-3-Clause |
 
-## 6. Python — инструменты разработки (`backend/requirements-dev.lock`, дополнительно 6)
+## 6. Python — инструменты разработки (`backend/requirements-dev.lock`, дополнительно 7)
 
 | Пакет | Версия | Лицензия |
 |---|---|---|
+| colorama | 0.4.6 | см. PyPI |
 | iniconfig | 2.3.1 | MIT |
 | packaging | 26.3 | Apache-2.0 OR BSD-2-Clause |
 | pluggy | 1.7.0 | MIT |

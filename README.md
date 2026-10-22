@@ -93,6 +93,23 @@ LLM_PROVIDER=openai_compatible docker compose --profile ai up -d --build
 Без неё всё работает: помощник отвечает по базе знаний, заключение собирается из данных досье.
 
 <details>
+<summary>Запуск на Windows без Docker (если Docker Desktop не устанавливается)</summary>
+
+Нужны Python 3.12 (python.org, галочка «Add python.exe to PATH»), Node.js 22 LTS и PostgreSQL 16 (установщик с
+postgresql.org; запомните пароль пользователя `postgres`).
+
+1. Двойной щелчок по `scripts\windows\start.cmd`. При первом запуске скрипт спросит пароль `postgres`, создаст базу
+   `credit`, поставит зависимости (Python — по lock-файлам с проверкой хэшей, npm — по `package-lock.json`), применит
+   миграции и тестовые данные и запустит в фоне симулятор, API, два воркера и интерфейс. Первый запуск — 3–5 минут.
+2. Откроется http://localhost:5173 — дальше всё как в разделе «Пошаговый сценарий проверки».
+3. Остановить — `scripts\windows\stop.cmd`; начать с чистыми данными — `scripts\windows\start.cmd -Reset`.
+   Журналы сервисов — в папке `.run`.
+
+Сквозные сценарии в этом режиме:
+`backend\.venv\Scripts\python tests\e2e\run_scenarios.py --base http://localhost:5173 --mocks http://127.0.0.1:8081`.
+</details>
+
+<details>
 <summary>Запуск без Docker (для разработки)</summary>
 
 Нужны Python 3.12, Node.js 22 и PostgreSQL 16.
