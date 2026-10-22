@@ -30,7 +30,7 @@ x-backend-env: &backend-env
 
 x-backend: &backend
   build: ./backend
-  image: credit-cabinet-backend:1.0.0
+  image: credit-cabinet-backend:1.1.0
   environment: *backend-env
   volumes:
     - uploads:/data/uploads
@@ -54,7 +54,7 @@ services:
 
   mocks:
     build: ./mocks
-    image: credit-cabinet-mocks:1.0.0
+    image: credit-cabinet-mocks:1.1.0
     environment:
       MOCK_LATENCY_SCALE: ${MOCK_LATENCY_SCALE:-1}   # множитель задержек источников (0 — без задержек)
       MOCK_ERROR_RATE: ${MOCK_ERROR_RATE:-0}         # доля случайных сбоев 0..1 для проверки устойчивости
@@ -97,7 +97,7 @@ services:
 
   web:
     build: ./frontend
-    image: credit-cabinet-web:1.0.0
+    image: credit-cabinet-web:1.1.0
     ports:
       - "${WEB_PORT:-8080}:80"
     depends_on:

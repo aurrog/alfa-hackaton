@@ -6,6 +6,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from app import __version__ as app_version
 from app.domain.state_machine import TRANSITIONS, Actor, TransitionError, available_transitions, reachable_statuses, resolve
 from app.domain.statuses import STATUS_META, TERMINAL_STATUSES, AppStatus
 from app.integrations import client as ic
@@ -175,7 +176,7 @@ def test_openapi_has_key_paths(api):
               "/api/v1/bank/queue", "/api/v1/bank/applications/{app_id}/decision", "/api/v1/bank/policy",
               "/api/v1/feed", "/api/v1/meta/state-machine"]:
         assert p in paths, p
-    assert spec["info"]["version"] == "1.0.0"
+    assert spec["info"]["version"] == app_version
 
 
 def test_live_and_request_id(api):

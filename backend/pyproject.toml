@@ -1,6 +1,6 @@
 [project]
 name = "credit-cabinet-backend"
-version = "1.0.0"
+version = "1.1.0"
 description = "Умный кредитный кабинет предпринимателя — API и кредитный конвейер"
 requires-python = ">=3.12,<3.13"
 license = { text = "MIT" }

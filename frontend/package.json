@@ -1,7 +1,7 @@
 {
   "name": "credit-cabinet-web",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Умный кредитный кабинет предпринимателя — интерфейс клиента и рабочее место банка",
   "type": "module",
   "license": "MIT",
